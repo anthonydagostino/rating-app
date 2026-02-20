@@ -1,0 +1,178 @@
+@page "/chats"
+@attribute [Authorize]
+@implements IAsyncDisposable
+
+<PageTitle>Chats - RatingApp</PageTitle>
+
+<div class="chats-wrap">
+    <div class="chats-layout">
+        <div class="chat-list-panel">
+            <div class="chat-list-header">Matches</div>
+            @if (_chats is null)
+            {
+                <p style="padding:1rem;color:var(--muted)">Loading...</p>
+            }
+            else if (!_chats.Any())
+            {
+                <p style="padding:1rem;color:var(--muted);font-size:0.875rem">No matches yet. Go rate some people!</p>
+            }
+            else
+            {
+                @foreach (var chat in _chats)
+                {
+                    <div class="chat-list-item @(chat.ChatId == _activeChatId ? "active" : "")"
+                         @onclick="() => SelectChat(chat)">
+                        <div class="chat-avatar">@chat.OtherUserDisplayName[0]</div>
+                        <div class="chat-item-info">
+                            <div class="chat-item-name">@chat.OtherUserDisplayName</div>
+                            @if (chat.LastMessageSnippet is not null)
+                            {
+                                <div class="chat-item-preview">@chat.LastMessageSnippet</div>
+                            }
+                            else
+                            {
+                                <div class="chat-item-preview">Matched @chat.MatchedAt.ToLocalTime().ToString("MMM d")</div>
+                            }
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+
+        <div class="chat-window-panel">
+            @if (_activeChatId == Guid.Empty)
+            {
+                <div class="chat-empty">
+                    <div style="text-align:center">
+                        <i class="bi bi-chat-heart" style="font-size:3rem;color:#E0E0E0"></i>
+                        <p style="margin-top:0.75rem;font-size:0.9rem">Select a match to start chatting</p>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="chat-window-header">@(_activeChat?.OtherUserDisplayName ?? "Chat")</div>
+                <div class="chat-messages" id="chat-messages-container">
+                    @foreach (var msg in _messages)
+                    {
+                        <div class="message-row @(msg.SenderUserId == _currentUserId ? "mine" : "theirs")">
+                            <div class="message-bubble">
+                                <div class="message-content">@msg.Content</div>
+                                <div class="message-time">@msg.CreatedAt.ToLocalTime().ToString("HH:mm")</div>
+                            </div>
+                        </div>
+                    }
+                    @if (!_messages.Any())
+                    {
+                        <p style="text-align:center;color:var(--muted);margin-top:2rem;font-size:0.875rem">No messages yet. Say hello!</p>
+                    }
+                </div>
+                <div class="chat-input-row">
+                    <input class="tinder-input" placeholder="Type a message..." @bind="_newMessage"
+                           @onkeydown="HandleKeyDown" />
+                    <button class="btn-send" @onclick="SendMessage"
+                            disabled="@(string.IsNullOrWhiteSpace(_newMessage))">
+                        Send
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Inject] private ChatApiService ChatService { get; set; } = default!;
+    [Inject] private CustomAuthStateProvider AuthState { get; set; } = default!;
+    [Inject] private NavigationManager Nav { get; set; } = default!;
+    [Inject] private Blazored.LocalStorage.ILocalStorageService LocalStorage { get; set; } = default!;
+
+    private List<ChatSummaryDto>? _chats;
+    private List<MessageDto> _messages = new();
+    private Guid _activeChatId;
+    private ChatSummaryDto? _activeChat;
+    private Guid _currentUserId;
+    private string _newMessage = "";
+    private HubConnection? _hubConnection;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _currentUserId = (await AuthState.GetCurrentUserIdAsync()) ?? Guid.Empty;
+        _chats = await ChatService.GetChatsAsync();
+        await ConnectToHubAsync();
+    }
+
+    private async Task ConnectToHubAsync()
+    {
+        var token = await LocalStorage.GetItemAsStringAsync("jwt");
+
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl("http://localhost:5212/hubs/chat", options =>
+            {
+                options.AccessTokenProvider = () => Task.FromResult<string?>(token);
+            })
+            .WithAutomaticReconnect()
+            .Build();
+
+        _hubConnection.On<MessageDto>("ReceiveMessage", msg =>
+        {
+            if (msg.ChatId == _activeChatId)
+            {
+                _messages.Add(msg);
+                InvokeAsync(StateHasChanged);
+            }
+            else
+            {
+                var chat = _chats?.FirstOrDefault(c => c.ChatId == msg.ChatId);
+                if (chat is not null)
+                    InvokeAsync(StateHasChanged);
+            }
+        });
+
+        try
+        {
+            await _hubConnection.StartAsync();
+        }
+        catch
+        {
+            // Hub connection failed - REST API still works
+        }
+    }
+
+    private async Task SelectChat(ChatSummaryDto chat)
+    {
+        _activeChatId = chat.ChatId;
+        _activeChat = chat;
+        _messages = await ChatService.GetMessagesAsync(chat.ChatId) ?? new();
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(_newMessage) || _activeChatId == Guid.Empty) return;
+
+        var content = _newMessage;
+        _newMessage = "";
+
+        if (_hubConnection?.State == HubConnectionState.Connected)
+        {
+            await _hubConnection.SendAsync("SendMessage", _activeChatId, content);
+        }
+        else
+        {
+            var msg = await ChatService.SendMessageAsync(_activeChatId, content);
+            if (msg is not null)
+                _messages.Add(msg);
+        }
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+            await SendMessage();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection is not null)
+            await _hubConnection.DisposeAsync();
+    }
+}

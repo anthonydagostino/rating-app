@@ -1,0 +1,299 @@
+@page "/profile"
+@attribute [Authorize]
+
+<PageTitle>Profile - RatingApp</PageTitle>
+
+<div class="profile-page">
+
+    <!-- Photos Section -->
+    <div class="profile-section">
+        <div class="profile-section-title">My Photos</div>
+
+        @if (_photos is null)
+        {
+            <p style="color:var(--muted)">Loading photos...</p>
+        }
+        else
+        {
+            @if (_photos.Count == 0)
+            {
+                <div style="background:#FFF0F5;border:1.5px solid #FFCDD9;border-radius:10px;padding:0.75rem 1rem;font-size:0.875rem;color:#FD297B;margin-bottom:1rem">
+                    <i class="bi bi-exclamation-circle-fill"></i>
+                    Add at least 1 photo to appear in Discover.
+                </div>
+            }
+
+            <div class="photo-grid">
+                @for (int i = 0; i < 6; i++)
+                {
+                    var idx = i;
+                    if (idx < _photos.Count)
+                    {
+                        var photo = _photos[idx];
+                        <div class="photo-slot filled">
+                            <img src="@photo.Url" alt="Photo @(idx+1)" />
+                            <button class="photo-delete-btn" @onclick="() => DeletePhoto(photo.Id)"
+                                    disabled="@_uploading" title="Remove photo">
+                                <i class="bi bi-x"></i>
+                            </button>
+                        </div>
+                    }
+                    else if (idx == _photos.Count && _photos.Count < 6)
+                    {
+                        <label for="photo-upload-input" class="photo-slot empty" style="cursor:pointer">
+                            @if (_uploading)
+                            {
+                                <div class="spinner-border spinner-border-sm" style="color:#FD297B"></div>
+                            }
+                            else
+                            {
+                                <i class="bi bi-plus-lg" style="font-size:1.5rem;color:#BDBDBD"></i>
+                            }
+                        </label>
+                    }
+                    else
+                    {
+                        <div class="photo-slot empty disabled">
+                            <i class="bi bi-plus-lg" style="font-size:1.5rem;color:#E0E0E0"></i>
+                        </div>
+                    }
+                }
+            </div>
+
+            <InputFile OnChange="OnFileSelected" accept="image/*"
+                       style="display:none;position:absolute;width:0;height:0" id="photo-upload-input" />
+
+            @if (_photoError is not null)
+            {
+                <div style="color:#FD297B;font-size:0.8rem;margin-top:0.5rem">@_photoError</div>
+            }
+
+            <p style="color:var(--muted);font-size:0.75rem;margin-top:0.5rem">
+                @_photos.Count / 6 photos &nbsp;·&nbsp; JPG, PNG or WebP &nbsp;·&nbsp; Max 5 MB each
+            </p>
+        }
+    </div>
+
+    <!-- Rating Summary -->
+    @if (_summary is not null)
+    {
+        <div class="profile-section" style="text-align:center">
+            <div class="rating-summary-number">@_summary.AverageScore.ToString("F1")</div>
+            <div style="color:var(--muted);font-size:0.85rem;margin-top:0.25rem">
+                avg rating from @_summary.RatingCount person(s)
+            </div>
+        </div>
+    }
+
+    <!-- Profile Info -->
+    <div class="profile-section">
+        <div class="profile-section-title">My Profile</div>
+        @if (_profile is null)
+        {
+            <p style="color:var(--muted)">Loading...</p>
+        }
+        else
+        {
+            <EditForm Model="_editModel" OnValidSubmit="SaveProfile">
+                <div class="form-field">
+                    <label>Email</label>
+                    <input class="tinder-input" value="@_profile.Email" disabled />
+                </div>
+                <div class="form-field">
+                    <label>Display Name</label>
+                    <InputText @bind-Value="_editModel.DisplayName" class="tinder-input" />
+                </div>
+                <div class="form-field">
+                    <label>Age</label>
+                    <input class="tinder-input" value="@_profile.Age" disabled />
+                </div>
+                <div class="row-fields">
+                    <div class="form-field">
+                        <label>Latitude</label>
+                        <InputNumber @bind-Value="_editModel.Latitude" class="tinder-input" />
+                    </div>
+                    <div class="form-field">
+                        <label>Longitude</label>
+                        <InputNumber @bind-Value="_editModel.Longitude" class="tinder-input" />
+                    </div>
+                </div>
+                @if (_profileMessage is not null)
+                {
+                    <div style="color:#26b050;font-size:0.875rem;margin-bottom:0.75rem">@_profileMessage</div>
+                }
+                <button type="submit" class="btn-tinder w-100">Save Profile</button>
+            </EditForm>
+        }
+    </div>
+
+    <!-- Preferences -->
+    <div class="profile-section">
+        <div class="profile-section-title">My Preferences</div>
+        @if (_prefs is null)
+        {
+            <p style="color:var(--muted)">Loading...</p>
+        }
+        else
+        {
+            <EditForm Model="_prefsModel" OnValidSubmit="SavePreferences">
+                <div class="form-field">
+                    <label>Interested in...</label>
+                    <InputSelect @bind-Value="_prefsModel.PreferredGender" class="tinder-select">
+                        <option value="1">Men</option>
+                        <option value="2">Women</option>
+                    </InputSelect>
+                </div>
+                <div class="row-fields">
+                    <div class="form-field">
+                        <label>Min Age</label>
+                        <InputNumber @bind-Value="_prefsModel.MinAge" class="tinder-input" min="18" max="99" />
+                    </div>
+                    <div class="form-field">
+                        <label>Max Age</label>
+                        <InputNumber @bind-Value="_prefsModel.MaxAge" class="tinder-input" min="18" max="99" />
+                    </div>
+                </div>
+                <div class="form-field">
+                    <label>Max Distance: @_prefsModel.MaxDistanceMiles mi</label>
+                    <input type="range" class="tinder-range" min="1" max="500"
+                           value="@_prefsModel.MaxDistanceMiles"
+                           @onchange="e => _prefsModel.MaxDistanceMiles = double.Parse(e.Value!.ToString()!)" />
+                </div>
+                @if (_prefsMessage is not null)
+                {
+                    <div style="color:#26b050;font-size:0.875rem;margin-bottom:0.75rem">@_prefsMessage</div>
+                }
+                <button type="submit" class="btn-tinder w-100">Save Preferences</button>
+            </EditForm>
+        }
+    </div>
+
+</div>
+
+@code {
+    [Inject] private ProfileApiService ProfileService { get; set; } = default!;
+    [Inject] private PhotoApiService PhotoService { get; set; } = default!;
+
+    private UserProfileDto? _profile;
+    private PreferenceDto? _prefs;
+    private RatingSummaryDto? _summary;
+    private List<PhotoDto>? _photos;
+    private readonly EditProfileModel _editModel = new();
+    private readonly EditPrefsModel _prefsModel = new();
+    private string? _profileMessage;
+    private string? _prefsMessage;
+    private string? _photoError;
+    private bool _uploading;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(LoadProfile(), LoadPreferences(), LoadSummary(), LoadPhotos());
+    }
+
+    private async Task LoadPhotos()
+    {
+        try { _photos = await PhotoService.GetPhotosAsync() ?? new(); }
+        catch { _photos = new(); }
+    }
+
+    private async Task LoadProfile()
+    {
+        try
+        {
+            _profile = await ProfileService.GetProfileAsync();
+            if (_profile is not null)
+            {
+                _editModel.DisplayName = _profile.DisplayName;
+                _editModel.Latitude = _profile.Latitude;
+                _editModel.Longitude = _profile.Longitude;
+            }
+        }
+        catch { }
+    }
+
+    private async Task LoadPreferences()
+    {
+        try
+        {
+            _prefs = await ProfileService.GetPreferencesAsync();
+            if (_prefs is not null)
+            {
+                _prefsModel.PreferredGender = _prefs.PreferredGender;
+                _prefsModel.MinAge = _prefs.MinAge;
+                _prefsModel.MaxAge = _prefs.MaxAge;
+                _prefsModel.MaxDistanceMiles = _prefs.MaxDistanceMiles;
+            }
+        }
+        catch { }
+    }
+
+    private async Task LoadSummary()
+    {
+        try { _summary = await ProfileService.GetRatingSummaryAsync(); }
+        catch { }
+    }
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        _photoError = null;
+        _uploading = true;
+        StateHasChanged();
+
+        var file = e.File;
+        var result = await PhotoService.UploadPhotoAsync(file);
+
+        if (result is not null)
+        {
+            _photos ??= new();
+            _photos!.Add(result);
+        }
+
+        _uploading = false;
+    }
+
+    private async Task DeletePhoto(Guid photoId)
+    {
+        _photoError = null;
+        var success = await PhotoService.DeletePhotoAsync(photoId);
+        if (success)
+            _photos?.RemoveAll(p => p.Id == photoId);
+        else
+            _photoError = "Could not delete photo (must keep at least 1).";
+    }
+
+    private async Task SaveProfile()
+    {
+        _profile = await ProfileService.UpdateProfileAsync(
+            new UpdateProfileRequest(_editModel.DisplayName, _editModel.Latitude, _editModel.Longitude));
+        _profileMessage = "Profile saved!";
+        await Task.Delay(2000);
+        _profileMessage = null;
+        StateHasChanged();
+    }
+
+    private async Task SavePreferences()
+    {
+        _prefs = await ProfileService.UpdatePreferencesAsync(
+            new PreferenceDto(_prefsModel.PreferredGender, _prefsModel.MinAge,
+                              _prefsModel.MaxAge, _prefsModel.MaxDistanceMiles));
+        _prefsMessage = "Preferences saved!";
+        await Task.Delay(2000);
+        _prefsMessage = null;
+        StateHasChanged();
+    }
+
+    private class EditProfileModel
+    {
+        public string DisplayName { get; set; } = "";
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+    }
+
+    private class EditPrefsModel
+    {
+        public int PreferredGender { get; set; } = 2;
+        public int MinAge { get; set; } = 18;
+        public int MaxAge { get; set; } = 45;
+        public double MaxDistanceMiles { get; set; } = 50;
+    }
+}

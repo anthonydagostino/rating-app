@@ -1,0 +1,45 @@
+@inherits LayoutComponentBase
+
+<div class="app-shell">
+    <AuthorizeView>
+        <Authorized>
+            <header class="app-header">
+                <span class="app-logo">RatingApp</span>
+                <button class="btn-ghost" @onclick="Logout">Sign out</button>
+            </header>
+
+            <main class="app-main">
+                @Body
+            </main>
+
+            <nav class="bottom-nav">
+                <NavLink href="/rate" class="bottom-nav-item" Match="NavLinkMatch.All">
+                    <i class="bi bi-fire"></i>
+                    <span>Discover</span>
+                </NavLink>
+                <NavLink href="/chats" class="bottom-nav-item">
+                    <i class="bi bi-chat-dots-fill"></i>
+                    <span>Chats</span>
+                </NavLink>
+                <NavLink href="/profile" class="bottom-nav-item">
+                    <i class="bi bi-person-circle"></i>
+                    <span>Profile</span>
+                </NavLink>
+            </nav>
+        </Authorized>
+        <NotAuthorized>
+            <main>@Body</main>
+        </NotAuthorized>
+    </AuthorizeView>
+</div>
+
+@code {
+    [Inject] private AuthApiService AuthService { get; set; } = default!;
+    [Inject] private NavigationManager Nav { get; set; } = default!;
+
+    private async Task Logout()
+    {
+        await AuthService.LogoutAsync();
+        Nav.NavigateTo("/login");
+    }
+}

@@ -1,0 +1,64 @@
+@page "/login"
+
+<PageTitle>Login - RatingApp</PageTitle>
+
+<div class="auth-page">
+    <div class="auth-logo">RatingApp</div>
+    <div class="auth-card">
+        <h2>Welcome back</h2>
+
+        <EditForm Model="_model" OnValidSubmit="HandleLogin">
+            <div class="form-field">
+                <label>Email</label>
+                <InputText @bind-Value="_model.Email" class="tinder-input" placeholder="you@example.com" type="email" />
+            </div>
+            <div class="form-field">
+                <label>Password</label>
+                <InputText @bind-Value="_model.Password" class="tinder-input" placeholder="Password" type="password" />
+            </div>
+
+            @if (_error is not null)
+            {
+                <div class="auth-error">@_error</div>
+            }
+
+            <button type="submit" class="btn-tinder w-100" disabled="@_loading">
+                @(_loading ? "Signing in..." : "Sign In")
+            </button>
+        </EditForm>
+
+        <div class="auth-footer">
+            Don't have an account? <a href="/register">Create one</a>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Inject] private AuthApiService AuthService { get; set; } = default!;
+    [Inject] private NavigationManager Nav { get; set; } = default!;
+
+    private readonly LoginModel _model = new();
+    private string? _error;
+    private bool _loading;
+
+    private async Task HandleLogin()
+    {
+        _loading = true;
+        _error = null;
+
+        var (success, error) = await AuthService.LoginAsync(_model.Email, _model.Password);
+
+        if (success)
+            Nav.NavigateTo("/rate");
+        else
+            _error = error ?? "Login failed.";
+
+        _loading = false;
+    }
+
+    private class LoginModel
+    {
+        public string Email { get; set; } = "";
+        public string Password { get; set; } = "";
+    }
+}

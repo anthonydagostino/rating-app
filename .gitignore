@@ -1,0 +1,43 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.csproj.bak
+
+## Secrets / environment-specific config
+appsettings.Development.json
+appsettings.Production.json
+*.pfx
+*.key
+.env
+
+## Uploads (user-uploaded files, not source code)
+**/wwwroot/uploads/
+
+## Test results & coverage
+TestResults/
+coverage/
+*.trx
+*.coveragexml
+*.coverage
+
+## JetBrains Rider
+.idea/
+*.sln.iml
+
+## Visual Studio Code
+.vscode/
+
+## OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+## NuGet
+*.nupkg
+.nuget/
+
+## Blazor WASM publish artifacts
+**/publish/

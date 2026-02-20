@@ -1,0 +1,205 @@
+@page "/rate"
+@attribute [Authorize]
+
+<PageTitle>Discover - RatingApp</PageTitle>
+
+@if (_matchMessage is not null)
+{
+    <div class="match-overlay">
+        <div class="match-card">
+            <h2>It's a Match!</h2>
+            <p>@_matchMessage</p>
+            <a href="/chats" class="btn-match-action">Send a Message</a>
+        </div>
+    </div>
+}
+
+<div class="rate-page">
+    @if (_loading)
+    {
+        <div class="empty-state">
+            <div class="spinner-border" style="color:#FD297B" role="status"></div>
+            <p style="margin-top:1rem;color:var(--muted)">Finding people near you...</p>
+        </div>
+    }
+    else if (_current is null)
+    {
+        <div class="empty-state">
+            <i class="bi bi-search-heart" style="font-size:3rem;color:#E0E0E0"></i>
+            <h3 style="margin-top:1rem">No one nearby right now</h3>
+            <p>Check back later or adjust your <a href="/profile">preferences</a>.</p>
+            <button class="btn-tinder" style="display:inline-block;margin-top:1rem;padding:0.75rem 2rem" @onclick="Reload">Refresh</button>
+        </div>
+    }
+    else
+    {
+        <div class="candidate-card">
+            @{
+                var photos = _current.PhotoUrls ?? new List<string>();
+                bool hasPhotos = photos.Count > 0;
+            }
+
+            @if (hasPhotos)
+            {
+                <div class="photo-carousel">
+                    <img class="carousel-img" src="@photos[_photoIndex]" alt="@_current.DisplayName" />
+
+                    @if (photos.Count > 1)
+                    {
+                        <div class="carousel-dots">
+                            @for (int i = 0; i < photos.Count; i++)
+                            {
+                                var idx = i;
+                                <span class="carousel-dot @(idx == _photoIndex ? "active" : "")"
+                                      @onclick="() => _photoIndex = idx"></span>
+                            }
+                        </div>
+
+                        @if (_photoIndex > 0)
+                        {
+                            <button class="carousel-btn carousel-btn-left" @onclick="PrevPhoto">
+                                <i class="bi bi-chevron-left"></i>
+                            </button>
+                        }
+                        @if (_photoIndex < photos.Count - 1)
+                        {
+                            <button class="carousel-btn carousel-btn-right" @onclick="NextPhoto">
+                                <i class="bi bi-chevron-right"></i>
+                            </button>
+                        }
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="candidate-avatar">@_current.DisplayName[0]</div>
+            }
+
+            <div class="candidate-card-body">
+                <div class="candidate-name">@_current.DisplayName</div>
+                <div class="candidate-tags">
+                    <span class="candidate-tag">@_current.Age years old</span>
+                    <span class="candidate-tag"><i class="bi bi-geo-alt-fill"></i> @_current.DistanceMiles mi away</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="rating-card">
+            <div class="rating-score">@_score</div>
+            <div class="rating-score-label">out of 10</div>
+            <input type="range" class="tinder-range" min="1" max="10" step="1"
+                   value="@_score"
+                   @onchange="e => _score = int.Parse(e.Value!.ToString()!)" />
+            <div class="rating-range-labels">
+                <span>Not interested</span>
+                <span>Perfect match</span>
+            </div>
+        </div>
+
+        <div class="action-row">
+            <button class="action-btn-skip" @onclick="Skip" title="Skip">
+                <i class="bi bi-x-lg"></i>
+            </button>
+            <button class="action-btn-rate" @onclick="SubmitRating" disabled="@_submitting">
+                <i class="bi bi-heart-fill"></i>
+                @(_submitting ? "Rating..." : $"Rate {_score}/10")
+            </button>
+        </div>
+
+        @if (_queue.Count > 0)
+        {
+            <p style="text-align:center;color:var(--muted);font-size:0.8rem;margin-top:1rem">
+                @_queue.Count more in queue
+            </p>
+        }
+    }
+</div>
+
+@code {
+    [Inject] private CandidateApiService CandidateService { get; set; } = default!;
+    [Inject] private RatingApiService RatingService { get; set; } = default!;
+
+    private readonly Queue<CandidateDto> _queue = new();
+    private CandidateDto? _current;
+    private int _score = 7;
+    private int _photoIndex = 0;
+    private bool _loading = true;
+    private bool _submitting;
+    private string? _matchMessage;
+    private bool _allLoaded;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadMoreCandidates(showLoading: true);
+        Advance();
+    }
+
+    private async Task LoadMoreCandidates(bool showLoading = false)
+    {
+        if (showLoading) _loading = true;
+        try
+        {
+            var candidates = await CandidateService.GetCandidatesAsync(pageSize: 10) ?? new();
+            foreach (var c in candidates)
+                _queue.Enqueue(c);
+            if (!candidates.Any()) _allLoaded = true;
+        }
+        catch { _allLoaded = true; }
+        _loading = false;
+    }
+
+    private void Advance()
+    {
+        _current = _queue.Count > 0 ? _queue.Dequeue() : null;
+        _score = 7;
+        _photoIndex = 0;
+
+        if (_queue.Count <= 2 && !_allLoaded)
+            _ = LoadMoreCandidates();
+    }
+
+    private void PrevPhoto()
+    {
+        if (_photoIndex > 0) _photoIndex--;
+    }
+
+    private void NextPhoto()
+    {
+        var count = _current?.PhotoUrls?.Count ?? 0;
+        if (_photoIndex < count - 1) _photoIndex++;
+    }
+
+    private async Task SubmitRating()
+    {
+        if (_current is null) return;
+        _submitting = true;
+
+        var result = await RatingService.SubmitRatingAsync(_current.UserId, _score);
+
+        if (result?.MatchCreated == true)
+        {
+            _matchMessage = $"You and {_current.DisplayName} both rated each other 7+!";
+            _ = ClearMatchMessageAfterDelay();
+        }
+
+        Advance();
+        _submitting = false;
+    }
+
+    private void Skip() => Advance();
+
+    private async Task Reload()
+    {
+        _allLoaded = false;
+        _queue.Clear();
+        await LoadMoreCandidates(showLoading: true);
+        Advance();
+    }
+
+    private async Task ClearMatchMessageAfterDelay()
+    {
+        await Task.Delay(5000);
+        _matchMessage = null;
+        StateHasChanged();
+    }
+}

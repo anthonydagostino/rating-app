@@ -1,0 +1,119 @@
+@page "/register"
+
+<PageTitle>Register - RatingApp</PageTitle>
+
+<div class="auth-page">
+    <div class="auth-logo">RatingApp</div>
+    <div class="auth-card">
+        <h2>Create Account</h2>
+
+        <EditForm Model="_model" OnValidSubmit="HandleRegister">
+            <div class="form-field">
+                <label>Email</label>
+                <InputText @bind-Value="_model.Email" class="tinder-input" placeholder="you@example.com" type="email" />
+            </div>
+            <div class="form-field">
+                <label>Password</label>
+                <InputText @bind-Value="_model.Password" class="tinder-input" placeholder="Min 8 chars, 1 uppercase, 1 digit" type="password" />
+            </div>
+            <div class="form-field">
+                <label>Display Name</label>
+                <InputText @bind-Value="_model.DisplayName" class="tinder-input" placeholder="How others will see you" />
+            </div>
+            <div class="form-field">
+                <label>I am a...</label>
+                <InputSelect @bind-Value="_model.Gender" class="tinder-select">
+                    <option value="1">Man</option>
+                    <option value="2">Woman</option>
+                </InputSelect>
+            </div>
+            <div class="form-field">
+                <label>Date of Birth</label>
+                <input type="date" class="tinder-input"
+                       value="@_model.BirthdateString"
+                       @onchange="OnBirthdateChanged"
+                       max="@MaxBirthdateString" />
+            </div>
+            <div class="row-fields">
+                <div class="form-field">
+                    <label>Latitude</label>
+                    <InputNumber @bind-Value="_model.Latitude" class="tinder-input" />
+                </div>
+                <div class="form-field">
+                    <label>Longitude</label>
+                    <InputNumber @bind-Value="_model.Longitude" class="tinder-input" />
+                </div>
+            </div>
+            <small style="display:block;color:var(--muted);font-size:0.75rem;margin-bottom:1rem;">
+                Default: New York City (40.71, -74.01)
+            </small>
+
+            @if (_error is not null)
+            {
+                <div class="auth-error">@_error</div>
+            }
+
+            <button type="submit" class="btn-tinder w-100" disabled="@_loading">
+                @(_loading ? "Creating account..." : "Create Account")
+            </button>
+        </EditForm>
+
+        <div class="auth-footer">
+            Already have an account? <a href="/login">Sign in</a>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Inject] private AuthApiService AuthService { get; set; } = default!;
+    [Inject] private NavigationManager Nav { get; set; } = default!;
+
+    private readonly RegisterModel _model = new();
+    private string? _error;
+    private bool _loading;
+
+    private string MaxBirthdateString => DateTime.Now.AddYears(-18).ToString("yyyy-MM-dd");
+
+    private void OnBirthdateChanged(ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value?.ToString(), out var dt))
+            _model.BirthdateString = dt.ToString("yyyy-MM-dd");
+    }
+
+    private async Task HandleRegister()
+    {
+        _loading = true;
+        _error = null;
+
+        if (!DateOnly.TryParse(_model.BirthdateString, out var birthdate))
+        {
+            _error = "Please enter a valid date of birth.";
+            _loading = false;
+            return;
+        }
+
+        var req = new RegisterRequest(
+            _model.Email, _model.Password, _model.DisplayName,
+            _model.Gender, birthdate, _model.Latitude, _model.Longitude);
+
+        var (success, error) = await AuthService.RegisterAsync(req);
+
+        if (success)
+            Nav.NavigateTo("/rate");
+        else
+            _error = error ?? "Registration failed.";
+
+        _loading = false;
+    }
+
+    private class RegisterModel
+    {
+        public string Email { get; set; } = "";
+        public string Password { get; set; } = "";
+        public string DisplayName { get; set; } = "";
+        public int Gender { get; set; } = 1;
+        public string BirthdateString { get; set; } = "1995-01-01";
+        public double Latitude { get; set; } = 40.7128;
+        public double Longitude { get; set; } = -74.0060;
+    }
+}
