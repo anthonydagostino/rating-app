@@ -120,7 +120,9 @@ if (app.Environment.IsDevelopment())
     await DatabaseSeeder.SeedAsync(db, hasher);
 }
 
-app.UseHttpsRedirection();
+// HTTPS redirection only in dev; in production Docker handles it at the proxy level
+if (app.Environment.IsDevelopment())
+    app.UseHttpsRedirection();
 app.UseCors("BlazorClient");
 app.UseAuthentication();
 app.UseAuthorization();
