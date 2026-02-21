@@ -34,6 +34,11 @@ builder.Services.AddHttpClient("RatingApi", client =>
 builder.Services.AddScoped(sp =>
     sp.GetRequiredService<IHttpClientFactory>().CreateClient("RatingApi"));
 
+// Unauthenticated client for third-party geocoding APIs
+builder.Services.AddHttpClient("GeocodingClient");
+builder.Services.AddScoped<GeocodingService>(sp =>
+    new GeocodingService(sp.GetRequiredService<IHttpClientFactory>().CreateClient("GeocodingClient")));
+
 // Application services
 builder.Services.AddScoped<PhotoApiService>();
 builder.Services.AddScoped<AuthApiService>();
