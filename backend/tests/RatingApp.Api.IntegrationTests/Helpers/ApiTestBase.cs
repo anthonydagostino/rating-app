@@ -9,6 +9,10 @@ namespace RatingApp.Api.IntegrationTests.Helpers;
 
 public abstract class ApiTestBase : IDisposable
 {
+    protected static readonly Guid SkillCriterionId   = new("00000000-0000-0000-0000-000000000001");
+    protected static readonly Guid CommCriterionId    = new("00000000-0000-0000-0000-000000000002");
+    protected static readonly Guid CultureCriterionId = new("00000000-0000-0000-0000-000000000003");
+
     protected readonly CustomWebApplicationFactory Factory;
     protected readonly HttpClient Client;
 
@@ -16,6 +20,20 @@ public abstract class ApiTestBase : IDisposable
     {
         Factory = new CustomWebApplicationFactory();
         Client = Factory.CreateClient();
+        SeedCriteria();
+    }
+
+    private void SeedCriteria()
+    {
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        if (db.RatingCriteria.Any()) return;
+        db.RatingCriteria.AddRange(
+            new RatingCriterion { Id = SkillCriterionId,   Name = "Skill",         Weight = 0.40, IsRequired = true,  IsActive = true },
+            new RatingCriterion { Id = CommCriterionId,    Name = "Communication", Weight = 0.35, IsRequired = true,  IsActive = true },
+            new RatingCriterion { Id = CultureCriterionId, Name = "Culture",       Weight = 0.25, IsRequired = false, IsActive = true }
+        );
+        db.SaveChanges();
     }
 
     protected HttpClient CreateAuthenticatedClient(string token)

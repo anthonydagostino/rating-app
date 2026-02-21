@@ -10,8 +10,9 @@ namespace RatingApp.Application.Tests.Services;
 
 public class RatingServiceTests
 {
-    private static RatingService CreateService() =>
-        new(InMemoryDbFactory.Create(), NullLogger<RatingService>.Instance);
+    private static readonly Guid SkillId   = new("00000000-0000-0000-0000-000000000001");
+    private static readonly Guid CommId    = new("00000000-0000-0000-0000-000000000002");
+    private static readonly Guid CultureId = new("00000000-0000-0000-0000-000000000003");
 
     private static AppUser MakeUser(Guid? id = null) => new()
     {
@@ -24,21 +25,37 @@ public class RatingServiceTests
         CreatedAt = DateTime.UtcNow
     };
 
+    private static void SeedCriteria(Infrastructure.Persistence.AppDbContext db)
+    {
+        db.RatingCriteria.AddRange(
+            new RatingCriterion { Id = SkillId,   Name = "Skill",         Weight = 0.40, IsRequired = true,  IsActive = true },
+            new RatingCriterion { Id = CommId,     Name = "Communication", Weight = 0.35, IsRequired = true,  IsActive = true },
+            new RatingCriterion { Id = CultureId,  Name = "Culture",       Weight = 0.25, IsRequired = false, IsActive = true }
+        );
+    }
+
+    // Submit all three criteria at the same score — aggregate equals that score
+    private static RatingCreateDto Dto(Guid ratedUserId, int score) =>
+        new(ratedUserId, new List<RatingCriterionScoreDto>
+        {
+            new(SkillId,   score),
+            new(CommId,    score),
+            new(CultureId, score)
+        }, null);
+
     [Fact]
     public async Task SubmitRatingAsync_BothRateAboveThreshold_CreatesMatch()
     {
         var db = InMemoryDbFactory.Create();
+        SeedCriteria(db);
         var svc = new RatingService(db, NullLogger<RatingService>.Instance);
         var alice = MakeUser();
         var bob = MakeUser();
         db.Users.AddRange(alice, bob);
         await db.SaveChangesAsync();
 
-        // Alice rates Bob 8
-        await svc.SubmitRatingAsync(alice.Id, new SubmitRatingRequest(bob.Id, 8));
-
-        // Bob rates Alice 9 — should trigger match
-        var matchId = await svc.SubmitRatingAsync(bob.Id, new SubmitRatingRequest(alice.Id, 9));
+        await svc.AddRating(alice.Id, Dto(bob.Id, 8));
+        var matchId = await svc.AddRating(bob.Id, Dto(alice.Id, 9));
 
         matchId.Should().NotBeNull();
         db.Matches.Should().HaveCount(1);
@@ -49,14 +66,15 @@ public class RatingServiceTests
     public async Task SubmitRatingAsync_OneRateBelowThreshold_NoMatch()
     {
         var db = InMemoryDbFactory.Create();
+        SeedCriteria(db);
         var svc = new RatingService(db, NullLogger<RatingService>.Instance);
         var alice = MakeUser();
         var bob = MakeUser();
         db.Users.AddRange(alice, bob);
         await db.SaveChangesAsync();
 
-        await svc.SubmitRatingAsync(alice.Id, new SubmitRatingRequest(bob.Id, 5)); // below threshold
-        var matchId = await svc.SubmitRatingAsync(bob.Id, new SubmitRatingRequest(alice.Id, 9));
+        await svc.AddRating(alice.Id, Dto(bob.Id, 5)); // below threshold
+        var matchId = await svc.AddRating(bob.Id, Dto(alice.Id, 9));
 
         matchId.Should().BeNull();
         db.Matches.Should().BeEmpty();
@@ -66,14 +84,15 @@ public class RatingServiceTests
     public async Task SubmitRatingAsync_BothBelowThreshold_NoMatch()
     {
         var db = InMemoryDbFactory.Create();
+        SeedCriteria(db);
         var svc = new RatingService(db, NullLogger<RatingService>.Instance);
         var alice = MakeUser();
         var bob = MakeUser();
         db.Users.AddRange(alice, bob);
         await db.SaveChangesAsync();
 
-        await svc.SubmitRatingAsync(alice.Id, new SubmitRatingRequest(bob.Id, 4));
-        var matchId = await svc.SubmitRatingAsync(bob.Id, new SubmitRatingRequest(alice.Id, 3));
+        await svc.AddRating(alice.Id, Dto(bob.Id, 4));
+        var matchId = await svc.AddRating(bob.Id, Dto(alice.Id, 3));
 
         matchId.Should().BeNull();
     }
@@ -82,14 +101,15 @@ public class RatingServiceTests
     public async Task SubmitRatingAsync_ThresholdExactly7_CreatesMatch()
     {
         var db = InMemoryDbFactory.Create();
+        SeedCriteria(db);
         var svc = new RatingService(db, NullLogger<RatingService>.Instance);
         var alice = MakeUser();
         var bob = MakeUser();
         db.Users.AddRange(alice, bob);
         await db.SaveChangesAsync();
 
-        await svc.SubmitRatingAsync(alice.Id, new SubmitRatingRequest(bob.Id, 7));
-        var matchId = await svc.SubmitRatingAsync(bob.Id, new SubmitRatingRequest(alice.Id, 7));
+        await svc.AddRating(alice.Id, Dto(bob.Id, 7));
+        var matchId = await svc.AddRating(bob.Id, Dto(alice.Id, 7));
 
         matchId.Should().NotBeNull("score of exactly 7 should qualify for a match");
     }
@@ -98,14 +118,15 @@ public class RatingServiceTests
     public async Task SubmitRatingAsync_UpdatingRating_DoesNotDuplicate()
     {
         var db = InMemoryDbFactory.Create();
+        SeedCriteria(db);
         var svc = new RatingService(db, NullLogger<RatingService>.Instance);
         var alice = MakeUser();
         var bob = MakeUser();
         db.Users.AddRange(alice, bob);
         await db.SaveChangesAsync();
 
-        await svc.SubmitRatingAsync(alice.Id, new SubmitRatingRequest(bob.Id, 5));
-        await svc.SubmitRatingAsync(alice.Id, new SubmitRatingRequest(bob.Id, 8)); // update
+        await svc.AddRating(alice.Id, Dto(bob.Id, 5));
+        await svc.AddRating(alice.Id, Dto(bob.Id, 8)); // update
 
         db.Ratings.Where(r => r.RaterUserId == alice.Id && r.RatedUserId == bob.Id)
             .Should().HaveCount(1);
@@ -115,10 +136,13 @@ public class RatingServiceTests
     [Fact]
     public async Task SubmitRatingAsync_RateSelf_ThrowsInvalidOperationException()
     {
-        var svc = CreateService();
+        var db = InMemoryDbFactory.Create();
+        SeedCriteria(db);
+        await db.SaveChangesAsync();
+        var svc = new RatingService(db, NullLogger<RatingService>.Instance);
         var userId = Guid.NewGuid();
 
-        var act = () => svc.SubmitRatingAsync(userId, new SubmitRatingRequest(userId, 8));
+        Func<Task> act = () => svc.AddRating(userId, Dto(userId, 8));
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*yourself*");
@@ -127,7 +151,8 @@ public class RatingServiceTests
     [Fact]
     public async Task GetRatingSummaryAsync_NoRatings_ReturnsZero()
     {
-        var svc = CreateService();
+        var db = InMemoryDbFactory.Create();
+        var svc = new RatingService(db, NullLogger<RatingService>.Instance);
         var userId = Guid.NewGuid();
 
         var summary = await svc.GetRatingSummaryAsync(userId);
