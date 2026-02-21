@@ -12,14 +12,16 @@ public class PhotoService
 {
     private readonly AppDbContext _db;
     private readonly string _uploadsRoot;
-    private readonly string _baseUrl;
+    private readonly string? _configuredBaseUrl;
+    private readonly IHttpContextAccessor _httpContextAccessor;
     private const int MaxPhotos = 6;
 
-    public PhotoService(AppDbContext db, IWebHostEnvironment env, IConfiguration config)
+    public PhotoService(AppDbContext db, IWebHostEnvironment env, IConfiguration config, IHttpContextAccessor httpContextAccessor)
     {
         _db = db;
         _uploadsRoot = Path.Combine(env.WebRootPath, "uploads");
-        _baseUrl = config["ApiBaseUrl"] ?? "http://localhost:5212";
+        _configuredBaseUrl = config["ApiBaseUrl"]; // optional override; auto-detects from request if absent
+        _httpContextAccessor = httpContextAccessor;
         Directory.CreateDirectory(_uploadsRoot);
     }
 
@@ -88,8 +90,21 @@ public class PhotoService
         await _db.SaveChangesAsync();
     }
 
-    public string BuildUrl(Guid userId, string fileName) =>
-        $"{_baseUrl}/uploads/{userId}/{fileName}";
+    public string BuildUrl(Guid userId, string fileName)
+    {
+        // Use configured base URL if set; otherwise auto-detect from the current HTTP request.
+        // This means photos work correctly in dev (port 5212), Docker (port 8080),
+        // or any other host without any config change needed.
+        var baseUrl = _configuredBaseUrl;
+        if (string.IsNullOrEmpty(baseUrl))
+        {
+            var req = _httpContextAccessor.HttpContext?.Request;
+            baseUrl = req is not null
+                ? $"{req.Scheme}://{req.Host}"
+                : "http://localhost:5212";
+        }
+        return $"{baseUrl}/uploads/{userId}/{fileName}";
+    }
 
     private PhotoDto ToDto(Photo photo, Guid userId) =>
         new(photo.Id, BuildUrl(userId, photo.FileName), photo.DisplayOrder);

@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Moq;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using RatingApp.Application.DTOs.Users;
 using RatingApp.Application.Services;
@@ -20,7 +21,9 @@ public class UserServiceTests
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["ApiBaseUrl"] = "http://localhost:5212" })
             .Build();
-        var photoSvc = new PhotoService(db, envMock.Object, config);
+        var httpContextAccessor = new Mock<IHttpContextAccessor>();
+        httpContextAccessor.Setup(x => x.HttpContext).Returns((HttpContext?)null);
+        var photoSvc = new PhotoService(db, envMock.Object, config, httpContextAccessor.Object);
         return (new UserService(db, photoSvc), db);
     }
 

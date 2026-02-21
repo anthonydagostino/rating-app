@@ -2,6 +2,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using RatingApp.Application.Services;
 using RatingApp.Application.Tests.Helpers;
@@ -23,7 +24,9 @@ public class CandidateServiceTests
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["ApiBaseUrl"] = "http://localhost:5212" })
             .Build();
-        var photoSvc = new PhotoService(db, envMock.Object, config);
+        var httpContextAccessor = new Mock<IHttpContextAccessor>();
+        httpContextAccessor.Setup(x => x.HttpContext).Returns((HttpContext?)null);
+        var photoSvc = new PhotoService(db, envMock.Object, config, httpContextAccessor.Object);
         var svc = new CandidateService(db, NullLogger<CandidateService>.Instance, photoSvc);
         return (svc, db);
     }

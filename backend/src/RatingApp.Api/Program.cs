@@ -12,6 +12,7 @@ using RatingApp.Infrastructure.Persistence;
 var builder = WebApplication.CreateBuilder(args);
 
 // --- Services ---
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
