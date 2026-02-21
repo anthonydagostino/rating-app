@@ -1,0 +1,36 @@
+name: Lint
+
+on:
+  push:
+    branches:
+      - dev
+      - 'feature/**'
+  pull_request:
+    branches:
+      - dev
+      - main
+
+jobs:
+  dotnet-format:
+    name: dotnet format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore backend
+        run: dotnet restore backend/RatingApp.sln
+
+      - name: Check formatting — backend
+        run: dotnet format backend/RatingApp.sln --verify-no-changes --severity warn
+
+      - name: Restore frontend
+        run: dotnet restore frontend/RatingApp.Client/RatingApp.Client.csproj
+
+      - name: Check formatting — frontend
+        run: dotnet format frontend/RatingApp.Client/RatingApp.Client.csproj --verify-no-changes --severity warn
