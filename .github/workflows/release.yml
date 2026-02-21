@@ -1,0 +1,170 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write      # create GitHub Releases and upload assets
+  packages: write      # push Docker images to ghcr.io
+
+jobs:
+  # ── 1. Run full test suite before releasing ──────────────────────────────────
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - run: dotnet restore backend/RatingApp.sln
+      - run: dotnet build backend/RatingApp.sln --no-restore -c Release
+      - run: >
+          dotnet test backend/tests/RatingApp.Application.Tests/RatingApp.Application.Tests.csproj
+          --no-build -c Release --verbosity normal
+      - run: >
+          dotnet test backend/tests/RatingApp.Api.IntegrationTests/RatingApp.Api.IntegrationTests.csproj
+          --no-build -c Release --verbosity normal
+
+  # ── 2. Build self-contained binaries for all platforms ──────────────────────
+  build-binaries:
+    name: Build Binaries
+    needs: test
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - rid: win-x64
+            archive: zip
+            exe: RatingApp.Api.exe
+          - rid: linux-x64
+            archive: tar
+            exe: RatingApp.Api
+          - rid: osx-x64
+            archive: tar
+            exe: RatingApp.Api
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # Publish Blazor WASM frontend
+      - name: Publish frontend
+        run: >
+          dotnet publish frontend/RatingApp.Client/RatingApp.Client.csproj
+          -c Release -o /tmp/frontend-out
+
+      # Inject Blazor output into API wwwroot before publishing
+      - name: Inject frontend into API wwwroot
+        run: |
+          mkdir -p backend/src/RatingApp.Api/wwwroot
+          cp -r /tmp/frontend-out/wwwroot/. backend/src/RatingApp.Api/wwwroot/
+
+      # Publish API as self-contained single-file binary
+      - name: Publish API (${{ matrix.rid }})
+        run: >
+          dotnet publish backend/src/RatingApp.Api/RatingApp.Api.csproj
+          -c Release
+          -r ${{ matrix.rid }}
+          --self-contained true
+          -p:PublishSingleFile=true
+          -o release/${{ matrix.rid }}
+
+      # Package
+      - name: Archive (zip — Windows)
+        if: matrix.archive == 'zip'
+        run: |
+          cd release/${{ matrix.rid }}
+          zip -r ../../rating-app-${{ matrix.rid }}.zip .
+
+      - name: Archive (tar — Linux/macOS)
+        if: matrix.archive == 'tar'
+        run: |
+          cd release/${{ matrix.rid }}
+          tar -czf ../../rating-app-${{ matrix.rid }}.tar.gz .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.rid }}
+          path: |
+            rating-app-${{ matrix.rid }}.zip
+            rating-app-${{ matrix.rid }}.tar.gz
+          if-no-files-found: ignore
+
+  # ── 3. Build & push Docker image to ghcr.io ─────────────────────────────────
+  docker:
+    name: Docker Image
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version tag
+        id: meta
+        run: echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/rating-app:${{ steps.meta.outputs.version }}
+            ghcr.io/${{ github.repository_owner }}/rating-app:latest
+
+  # ── 4. Create GitHub Release with all assets ─────────────────────────────────
+  release:
+    name: GitHub Release
+    needs: [ build-binaries, docker ]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: binary-*
+          merge-multiple: true
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            rating-app-win-x64.zip
+            rating-app-linux-x64.tar.gz
+            rating-app-osx-x64.tar.gz
+          body: |
+            ## Docker (recommended)
+
+            ```bash
+            docker pull ghcr.io/anthonydagostino/rating-app:${{ github.ref_name }}
+            ```
+
+            See the [README](https://github.com/anthonydagostino/rating-app#running-with-docker-compose-recommended) for the full docker-compose setup.
+
+            ## Standalone Binaries
+
+            | Platform | Download |
+            |----------|---------|
+            | Windows x64 | `rating-app-win-x64.zip` |
+            | Linux x64 | `rating-app-linux-x64.tar.gz` |
+            | macOS x64 | `rating-app-osx-x64.tar.gz` |
+
+            See the [README](https://github.com/anthonydagostino/rating-app#standalone-binary) for setup instructions.

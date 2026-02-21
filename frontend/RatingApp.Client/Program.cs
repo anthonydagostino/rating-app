@@ -10,7 +10,11 @@ var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
-const string ApiBaseUrl = "http://localhost:5212";
+// In development the frontend and backend run on separate ports.
+// In production the API serves the Blazor app from the same origin.
+var apiBaseUrl = builder.HostEnvironment.IsDevelopment()
+    ? "http://localhost:5212"
+    : builder.HostEnvironment.BaseAddress.TrimEnd('/');
 
 // Auth
 builder.Services.AddBlazoredLocalStorage();
@@ -23,7 +27,7 @@ builder.Services.AddScoped<AuthenticationStateProvider>(
 builder.Services.AddTransient<JwtAuthMessageHandler>();
 builder.Services.AddHttpClient("RatingApi", client =>
 {
-    client.BaseAddress = new Uri(ApiBaseUrl);
+    client.BaseAddress = new Uri(apiBaseUrl);
 }).AddHttpMessageHandler<JwtAuthMessageHandler>();
 
 // Provide a default HttpClient that uses the named client (for convenience)

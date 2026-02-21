@@ -76,7 +76,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization();
 builder.Services.AddSignalR();
 
-// CORS for Blazor WASM
+// CORS for Blazor WASM dev server
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("BlazorClient", policy =>
@@ -100,16 +100,22 @@ var uploadsPath = Path.Combine(app.Environment.WebRootPath ??
 Directory.CreateDirectory(uploadsPath);
 app.UseStaticFiles();
 
+// Run migrations on startup for relational databases (skipped for InMemory test DB)
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    if (db.Database.IsRelational())
+        db.Database.Migrate();
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 
-    // Auto-migrate and seed in development
+    // Seed demo users only in development
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate();
-
     var hasher = scope.ServiceProvider.GetRequiredService<RatingApp.Domain.Interfaces.IPasswordHasher>();
     await DatabaseSeeder.SeedAsync(db, hasher);
 }
@@ -124,4 +130,12 @@ app.MapHub<ChatHub>("/hubs/chat");
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }))
    .AllowAnonymous();
 
+// In production the API serves the Blazor WASM frontend.
+// All unmatched routes fall back to index.html for client-side routing.
+if (!app.Environment.IsDevelopment())
+    app.MapFallbackToFile("index.html");
+
 app.Run();
+
+// Expose Program class for WebApplicationFactory in integration tests
+public partial class Program { }

@@ -1,150 +1,216 @@
-# RatingApp — Mutual Rating MVP
+# RatingApp
 
-A full-stack "mutual rating" app where users rate each other 1–10. When both users rate each other 7 or above, a match is created and a real-time chat opens.
+A full-stack mutual-rating app: users rate each other 1–10. When both rate each other ≥ 7, a match is created and a real-time chat opens.
 
 **Stack:** ASP.NET Core 8 · Blazor WASM · PostgreSQL · EF Core · SignalR · JWT Auth
 
+[![CI](https://github.com/anthonydagostino/rating-app/actions/workflows/ci.yml/badge.svg)](https://github.com/anthonydagostino/rating-app/actions/workflows/ci.yml)
+
 ---
 
-## Quick Start
+## Download & Run (Latest Release)
 
-### Prerequisites
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8)
-- [Docker Desktop](https://www.docker.com/products/docker-desktop) (for Postgres)
+> **Easiest path — no code required.**
 
-### 1. Start PostgreSQL
+Go to the [Releases page](https://github.com/anthonydagostino/rating-app/releases/latest) and choose your method:
+
+### Running with Docker Compose (Recommended)
+
+Requires [Docker Desktop](https://www.docker.com/products/docker-desktop).
 
 ```bash
-# From repo root
+# 1. Copy the env template and set your secrets
 cp .env.example .env
+#    Edit .env — at minimum change JWT_SECRET to a random 32+ char string
+
+# 2. Pull and start everything (app + PostgreSQL)
+docker compose -f docker/docker-compose.yml up -d
+
+# 3. Open the app
+open http://localhost:8080
+```
+
+To stop:
+```bash
+docker compose -f docker/docker-compose.yml down
+```
+
+To upgrade to a new release:
+```bash
+docker compose -f docker/docker-compose.yml pull
 docker compose -f docker/docker-compose.yml up -d
 ```
 
-Optional: start pgAdmin too
+### Standalone Binary
+
+Requires [PostgreSQL 14+](https://www.postgresql.org/download/) already running.
+
+1. Download the archive for your platform from the [latest release](https://github.com/anthonydagostino/rating-app/releases/latest):
+   - **Windows** — `rating-app-win-x64.zip`
+   - **Linux** — `rating-app-linux-x64.tar.gz`
+   - **macOS** — `rating-app-osx-x64.tar.gz`
+
+2. Extract and configure:
+
 ```bash
-docker compose -f docker/docker-compose.yml --profile tools up -d
-# pgAdmin → http://localhost:5050  (admin@ratingapp.dev / admin)
+# Linux / macOS
+tar -xzf rating-app-linux-x64.tar.gz
+cd rating-app-linux-x64
 ```
 
-### 2. Run Database Migrations
+3. Set environment variables (or edit `appsettings.json`):
 
 ```bash
-cd backend
-dotnet ef database update \
-  --project src/RatingApp.Infrastructure \
-  --startup-project src/RatingApp.Api
+export ConnectionStrings__DefaultConnection="Host=localhost;Port=5432;Database=ratingapp_db;Username=postgres;Password=yourpassword"
+export Jwt__Secret="your-random-secret-at-least-32-chars-long"
+export ASPNETCORE_URLS="http://localhost:8080"
 ```
 
-> Migrations are also run automatically on startup in Development mode.
+4. Run:
 
-### 3. Start the Backend
+```bash
+# Linux / macOS
+chmod +x RatingApp.Api
+./RatingApp.Api
+
+# Windows
+RatingApp.Api.exe
+```
+
+5. Open `http://localhost:8080`
+
+> The app runs migrations automatically on startup — no manual `dotnet ef` commands needed.
+
+---
+
+## Development Setup
+
+### Prerequisites
+- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop) (for PostgreSQL)
+
+### 1. Clone and start PostgreSQL
+
+```bash
+git clone https://github.com/anthonydagostino/rating-app.git
+cd rating-app
+cp .env.example .env
+docker compose -f docker/docker-compose.yml up postgres -d
+```
+
+### 2. Start the backend
 
 ```bash
 cd backend/src/RatingApp.Api
 dotnet run
+# API: http://localhost:5212   Swagger: http://localhost:5212/swagger
 ```
 
-API available at: `https://localhost:7100`
-Swagger UI: `https://localhost:7100/swagger`
+On first run in Development, 20 seed users are created automatically.
 
-> On first run in Development, 20 seed users are created automatically.
-
-### 4. Start the Frontend
+### 3. Start the frontend
 
 ```bash
 cd frontend/RatingApp.Client
 dotnet run
+# App: http://localhost:5173
 ```
 
-Frontend available at: `https://localhost:7200`
+---
+
+## Branch Strategy
+
+| Branch | Purpose |
+|--------|---------|
+| `main` | Stable, production-ready. Protected — merge via PR only. |
+| `dev` | Active development. CI runs on every push. |
+
+**Workflow:**
+1. Work on `dev` (or a feature branch off `dev`)
+2. Open a PR from `dev` → `main`
+3. CI must pass before merging
+
+---
+
+## Releases & Versioning
+
+Releases follow [Semantic Versioning](https://semver.org): `vMAJOR.MINOR.PATCH`
+
+To cut a release (maintainers only):
+
+```bash
+git checkout main
+git pull
+git tag v1.2.3
+git push origin v1.2.3
+```
+
+This triggers the release pipeline which automatically:
+1. Runs all 49 tests (31 unit + 18 integration)
+2. Builds self-contained binaries for Windows, Linux, and macOS
+3. Builds and pushes a Docker image to `ghcr.io/anthonydagostino/rating-app`
+4. Creates a GitHub Release with the binaries and auto-generated changelog
 
 ---
 
 ## Configuration
 
-The backend reads configuration in this order (last wins):
+The backend reads configuration in priority order (last wins):
 
-1. `appsettings.json` (committed, placeholder values)
-2. `appsettings.Development.json` (committed, local dev defaults)
-3. Environment variables (use `__` as separator, e.g. `Jwt__Secret=...`)
-4. `dotnet user-secrets` (recommended for local secret override)
+| Source | Notes |
+|--------|-------|
+| `appsettings.json` | Committed, placeholder values |
+| `appsettings.{Environment}.json` | Per-environment overrides |
+| Environment variables | Use `__` as separator, e.g. `Jwt__Secret` |
+| `dotnet user-secrets` | Recommended for local dev secrets |
 
-**To set the JWT secret using user-secrets:**
+**Key settings:**
+
+| Variable | Description |
+|----------|-------------|
+| `ConnectionStrings__DefaultConnection` | PostgreSQL connection string |
+| `Jwt__Secret` | HMAC-SHA256 signing key (min 32 chars) |
+| `Jwt__Issuer` | JWT issuer claim (default: `RatingApp`) |
+| `Jwt__Audience` | JWT audience claim (default: `RatingApp.Client`) |
+| `Jwt__ExpiryHours` | Token lifetime in hours (default: `24`) |
+
+---
+
+## Running Tests
+
 ```bash
-cd backend/src/RatingApp.Api
-dotnet user-secrets set "Jwt:Secret" "your-super-secret-key-at-least-32-chars"
+cd backend
+
+# All tests
+dotnet test RatingApp.sln -c Release
+
+# Unit tests only (31 tests — no DB or network needed)
+dotnet test tests/RatingApp.Application.Tests -c Release
+
+# Integration tests only (18 tests — uses in-memory DB)
+dotnet test tests/RatingApp.Api.IntegrationTests -c Release
 ```
 
 ---
 
-## Seed Accounts
-
-On startup in Development, 20 users are seeded:
-- Mix of Men and Women
-- Located near New York City (±1.5° lat/lon)
-- Default preferences: opposite gender, 18–45, 50 miles
-
-**Password for all seed users:** `Password123!`
-
-To find a seeded email: check the database or use the Swagger `/api/auth/login` endpoint and try emails from your DB. You can also register a new account from the UI.
-
----
-
-## API Endpoints
+## API Reference
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/api/auth/register` | No | Register new user |
-| POST | `/api/auth/login` | No | Login, get JWT |
+| POST | `/api/auth/register` | No | Register |
+| POST | `/api/auth/login` | No | Login, returns JWT |
 | GET | `/api/me` | Yes | Get own profile |
 | PUT | `/api/me` | Yes | Update profile |
-| GET | `/api/me/rating-summary` | Yes | Get avg rating + count |
-| GET | `/api/me/preferences` | Yes | Get match preferences |
+| GET | `/api/me/rating-summary` | Yes | Avg rating + count |
+| GET | `/api/me/preferences` | Yes | Match preferences |
 | PUT | `/api/me/preferences` | Yes | Update preferences |
-| GET | `/api/candidates?pageSize=10` | Yes | Get candidate feed |
+| GET | `/api/candidates?pageSize=10` | Yes | Candidate feed |
 | POST | `/api/ratings` | Yes | Submit a rating |
-| GET | `/api/chats` | Yes | List user's chats |
-| GET | `/api/chats/{id}/messages` | Yes | Get last 50 messages |
-| POST | `/api/chats/{id}/messages` | Yes | Send a message |
-| WS | `/hubs/chat` | Yes (JWT) | SignalR real-time hub |
-
-### Sample Requests
-
-**Register:**
-```json
-POST /api/auth/register
-{
-  "email": "alice@example.com",
-  "password": "Password1!",
-  "displayName": "Alice",
-  "gender": 2,
-  "birthdate": "1997-03-15",
-  "latitude": 40.7128,
-  "longitude": -74.0060
-}
-```
-
-**Login:**
-```json
-POST /api/auth/login
-{ "email": "alice@example.com", "password": "Password1!" }
-```
-Response: `{ "token": "eyJ...", "userId": "...", "displayName": "Alice", "email": "alice@example.com" }`
-
-**Submit Rating:**
-```json
-POST /api/ratings
-Authorization: Bearer {token}
-{ "ratedUserId": "...", "score": 8 }
-```
-Response: `{ "matchCreated": true, "matchId": "..." }` or `{ "matchCreated": false, "matchId": null }`
-
-**Send Message:**
-```json
-POST /api/chats/{chatId}/messages
-Authorization: Bearer {token}
-{ "content": "Hey, nice to meet you!" }
-```
+| GET | `/api/chats` | Yes | List chats |
+| GET | `/api/chats/{id}/messages` | Yes | Last 50 messages |
+| POST | `/api/chats/{id}/messages` | Yes | Send message |
+| WS | `/hubs/chat?access_token=...` | Yes | SignalR real-time chat |
+| GET | `/health` | No | Health check |
 
 ---
 
@@ -152,49 +218,52 @@ Authorization: Bearer {token}
 
 ```
 RatingApp/
-├── .env.example              # Environment variable template
-├── README.md
+├── .github/
+│   └── workflows/
+│       ├── ci.yml          # Tests on push to main/dev and PRs
+│       └── release.yml     # Binaries + Docker + GitHub Release on vX.Y.Z tag
 ├── docker/
-│   └── docker-compose.yml    # Postgres (+ optional pgAdmin)
+│   ├── Dockerfile          # Multi-stage build (frontend + backend combined)
+│   └── docker-compose.yml  # App + PostgreSQL + optional pgAdmin
 ├── backend/
 │   ├── RatingApp.sln
-│   └── src/
-│       ├── RatingApp.Domain/          # Entities, enums, interfaces
-│       ├── RatingApp.Infrastructure/  # EF Core, migrations, security
-│       ├── RatingApp.Application/     # Services, DTOs, validators
-│       └── RatingApp.Api/             # Controllers, SignalR hub, Program.cs
+│   ├── src/
+│   │   ├── RatingApp.Domain/          # Entities, enums, interfaces
+│   │   ├── RatingApp.Infrastructure/  # EF Core, migrations, security
+│   │   ├── RatingApp.Application/     # Services, DTOs, validators
+│   │   └── RatingApp.Api/             # Controllers, SignalR hub, Program.cs
+│   └── tests/
+│       ├── RatingApp.Application.Tests/     # 31 unit tests
+│       └── RatingApp.Api.IntegrationTests/  # 18 integration tests
 └── frontend/
-    └── RatingApp.Client/              # Blazor WASM
+    └── RatingApp.Client/   # Blazor WASM
 ```
 
 ---
 
 ## How Matching Works
 
-1. User A rates User B a score ≥ 7
-2. System checks if User B has already rated User A ≥ 7
-3. If yes → a **Match** is created (with normalized GUID ordering: smaller GUID = UserAId)
-4. A **Chat** is automatically created for that match
-5. Both users can now message each other in real-time via SignalR
+1. User A rates User B **≥ 7**
+2. The system checks if User B already rated User A **≥ 7**
+3. If yes → a **Match** is created and a **Chat** opens automatically
+4. Both users can message each other in real-time via SignalR
 
-Ratings are **upsertable** — re-rating the same person updates the score and rechecks the match condition.
-
----
-
-## Real-Time Chat
-
-The SignalR hub at `/hubs/chat` authenticates via JWT passed as `?access_token=` query parameter (required because WebSocket upgrades can't send custom headers).
-
-On connect, the hub automatically adds the user to all their existing chat groups (`chat-{chatId}`). When a match happens, call `JoinChat(chatId)` from the client to join the new group.
+Ratings are **upsertable** — re-rating someone updates the score and re-checks the match condition.
 
 ---
 
-## Assumptions
+## Seed Accounts (Development only)
 
-- Gender is binary (Man/Woman) for this MVP
-- Location is entered as lat/lon manually — no geocoding integration
-- Distance uses Haversine formula computed in C# after a bounding-box SQL prefilter; no PostGIS required
-- JWT tokens expire after 24 hours (configurable via `Jwt:ExpiryHours`)
-- Seeding only runs in Development environment and is idempotent
-- No email verification, password reset, or account deletion in MVP
-- Messages are not encrypted at rest (MVP scope)
+On first run in Development, 20 users are seeded near New York City with a mix of genders.
+
+**Password for all seed users:** `Password123!`
+
+---
+
+## Road Map
+
+- [ ] Mobile app (MAUI Blazor Hybrid / React Native)
+- [ ] Email verification & password reset
+- [ ] Photo moderation
+- [ ] Push notifications
+- [ ] Subscription / paywall

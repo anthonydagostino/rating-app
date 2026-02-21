@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  backend-tests:
+    name: Backend — Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore backend/RatingApp.sln
+
+      - name: Build
+        run: dotnet build backend/RatingApp.sln --no-restore -c Release
+
+      - name: Unit tests
+        run: >
+          dotnet test backend/tests/RatingApp.Application.Tests/RatingApp.Application.Tests.csproj
+          --no-build -c Release --verbosity normal
+          --logger "trx;LogFileName=unit-results.trx"
+
+      - name: Integration tests
+        run: >
+          dotnet test backend/tests/RatingApp.Api.IntegrationTests/RatingApp.Api.IntegrationTests.csproj
+          --no-build -c Release --verbosity normal
+          --logger "trx;LogFileName=integration-results.trx"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: '**/*.trx'
+
+  frontend-build:
+    name: Frontend — Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore frontend/RatingApp.Client/RatingApp.Client.csproj
+
+      - name: Build
+        run: dotnet build frontend/RatingApp.Client/RatingApp.Client.csproj --no-restore -c Release
