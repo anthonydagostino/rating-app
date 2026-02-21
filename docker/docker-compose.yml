@@ -22,6 +22,8 @@ services:
       Jwt__Issuer: RatingApp
       Jwt__Audience: RatingApp.Client
       Jwt__ExpiryHours: "24"
+    volumes:
+      - uploads_data:/app/wwwroot/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -62,3 +64,4 @@ services:
 
 volumes:
   postgres_data:
+  uploads_data:
