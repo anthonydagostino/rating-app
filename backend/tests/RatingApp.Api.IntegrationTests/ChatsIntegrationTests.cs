@@ -75,7 +75,7 @@ public class ChatsIntegrationTests : ApiTestBase
         // Create a match between A and B
         var (tokenA, userAId) = await RegisterAndGetTokenAsync("msgs-403a@test.com", gender: 1);
         var (tokenB, userBId) = await RegisterAndGetTokenAsync("msgs-403b@test.com", gender: 2);
-        var (tokenC, _)       = await RegisterAndGetTokenAsync("msgs-403c@test.com", gender: 1);
+        var (tokenC, _) = await RegisterAndGetTokenAsync("msgs-403c@test.com", gender: 1);
 
         var authedA = CreateAuthenticatedClient(tokenA);
         var authedB = CreateAuthenticatedClient(tokenB);

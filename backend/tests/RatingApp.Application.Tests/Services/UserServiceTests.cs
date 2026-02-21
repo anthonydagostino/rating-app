@@ -115,9 +115,13 @@ public class UserServiceTests
         var (svc, db) = CreateService();
         var user = new AppUser
         {
-            Id = Guid.NewGuid(), Email = "nopref@test.com", DisplayName = "No Pref",
-            Gender = Gender.Man, Birthdate = new DateOnly(1995, 1, 1),
-            PasswordHash = "hash", CreatedAt = DateTime.UtcNow
+            Id = Guid.NewGuid(),
+            Email = "nopref@test.com",
+            DisplayName = "No Pref",
+            Gender = Gender.Man,
+            Birthdate = new DateOnly(1995, 1, 1),
+            PasswordHash = "hash",
+            CreatedAt = DateTime.UtcNow
         };
         db.Users.Add(user);
         await db.SaveChangesAsync();
@@ -149,9 +153,13 @@ public class UserServiceTests
         var (svc, db) = CreateService();
         var user = new AppUser
         {
-            Id = Guid.NewGuid(), Email = "newpref@test.com", DisplayName = "New",
-            Gender = Gender.Man, Birthdate = new DateOnly(1995, 1, 1),
-            PasswordHash = "hash", CreatedAt = DateTime.UtcNow
+            Id = Guid.NewGuid(),
+            Email = "newpref@test.com",
+            DisplayName = "New",
+            Gender = Gender.Man,
+            Birthdate = new DateOnly(1995, 1, 1),
+            PasswordHash = "hash",
+            CreatedAt = DateTime.UtcNow
         };
         db.Users.Add(user);
         await db.SaveChangesAsync();
