@@ -2,9 +2,13 @@ name: CI
 
 on:
   push:
-    branches: [ master, dev ]
+    branches:
+      - dev
+      - 'feature/**'
   pull_request:
-    branches: [ master ]
+    branches:
+      - dev   # feature branches merge here first
+      - main  # dev merges here for production
 
 jobs:
   backend-tests:
