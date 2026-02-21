@@ -7,18 +7,6 @@ namespace RatingApp.Api.IntegrationTests;
 
 public class RatingsIntegrationTests : ApiTestBase
 {
-    private object RatingPayload(Guid ratedUserId, int score) => new
-    {
-        ratedUserId,
-        criteria = new[]
-        {
-            new { criterionId = SkillCriterionId,   score },
-            new { criterionId = CommCriterionId,    score },
-            new { criterionId = CultureCriterionId, score }
-        },
-        comment = (string?)null
-    };
-
     [Fact]
     public async Task SubmitRating_BelowThreshold_MatchCreatedIsFalse()
     {
@@ -85,5 +73,114 @@ public class RatingsIntegrationTests : ApiTestBase
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var content = await response.Content.ReadAsStringAsync();
         content.Should().Contain("weightedAggregate");
+    }
+
+    // ── Validation → 400 ────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task SubmitRating_EmptyCriteriaList_Returns400()
+    {
+        var (token, _) = await RegisterAndGetTokenAsync("emptyC@test.com");
+        var authed = CreateAuthenticatedClient(token);
+
+        var payload = new { ratedUserId = Guid.NewGuid(), criteria = Array.Empty<object>(), comment = (string?)null };
+        var response = await authed.PostAsJsonAsync("/api/ratings", payload);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task SubmitRating_ScoreOutOfRange_Returns400()
+    {
+        var (tokenA, _) = await RegisterAndGetTokenAsync("rangeA@test.com", gender: 1);
+        var (_, userBId) = await RegisterAndGetTokenAsync("rangeB@test.com", gender: 2);
+        var authed = CreateAuthenticatedClient(tokenA);
+
+        var payload = new
+        {
+            ratedUserId = userBId,
+            criteria = new[] { new { criterionId = SkillCriterionId, score = 11 } },
+            comment = (string?)null
+        };
+        var response = await authed.PostAsJsonAsync("/api/ratings", payload);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task SubmitRating_DuplicateCriterionIds_Returns400()
+    {
+        var (tokenA, _) = await RegisterAndGetTokenAsync("dupA@test.com", gender: 1);
+        var (_, userBId) = await RegisterAndGetTokenAsync("dupB@test.com", gender: 2);
+        var authed = CreateAuthenticatedClient(tokenA);
+
+        var payload = new
+        {
+            ratedUserId = userBId,
+            criteria = new[]
+            {
+                new { criterionId = SkillCriterionId, score = 8 },
+                new { criterionId = SkillCriterionId, score = 7 }
+            },
+            comment = (string?)null
+        };
+        var response = await authed.PostAsJsonAsync("/api/ratings", payload);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    // ── Unauthenticated → 401 ────────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetCriteria_Unauthenticated_Returns401()
+    {
+        var response = await Client.GetAsync("/api/ratings/criteria");
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task GetAggregate_Unauthenticated_Returns401()
+    {
+        var response = await Client.GetAsync($"/api/ratings/candidates/{Guid.NewGuid()}/aggregate");
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    // ── Edge cases ───────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetAggregate_NoRatings_ReturnsZeroAggregateAndTotalRatings()
+    {
+        var (token, userId) = await RegisterAndGetTokenAsync("noRatingsUser@test.com");
+        var authed = CreateAuthenticatedClient(token);
+
+        var response = await authed.GetAsync($"/api/ratings/candidates/{userId}/aggregate");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var content = await response.Content.ReadAsStringAsync();
+        content.Should().Contain("\"totalRatings\":0");
+        content.Should().Contain("\"weightedAggregate\":0");
+    }
+
+    [Fact]
+    public async Task SubmitRating_WithComment_Returns200()
+    {
+        var (tokenA, _) = await RegisterAndGetTokenAsync("cmtA@test.com", gender: 1);
+        var (_, userBId) = await RegisterAndGetTokenAsync("cmtB@test.com", gender: 2);
+        var authed = CreateAuthenticatedClient(tokenA);
+
+        var payload = new
+        {
+            ratedUserId = userBId,
+            criteria = new[]
+            {
+                new { criterionId = SkillCriterionId,   score = 8 },
+                new { criterionId = CommCriterionId,    score = 7 },
+                new { criterionId = CultureCriterionId, score = 9 }
+            },
+            comment = "Great person to work with!"
+        };
+        var response = await authed.PostAsJsonAsync("/api/ratings", payload);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 }

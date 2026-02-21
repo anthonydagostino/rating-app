@@ -16,9 +16,6 @@ public class AppDbContext : DbContext
     public DbSet<Photo> Photos => Set<Photo>();
     public DbSet<RatingCriterion> RatingCriteria => Set<RatingCriterion>();
     public DbSet<RatingDetail> RatingDetails => Set<RatingDetail>();
-    public DbSet<RatingSession> RatingSessions => Set<RatingSession>();
-    public DbSet<SessionMessage> SessionMessages => Set<SessionMessage>();
-    public DbSet<SessionParticipantRating> SessionParticipantRatings => Set<SessionParticipantRating>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
