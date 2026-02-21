@@ -12,6 +12,7 @@ public static class DependencyInjection
         services.AddScoped<AuthService>();
         services.AddScoped<UserService>();
         services.AddScoped<CandidateService>();
+        services.AddScoped<IRatingService, RatingService>();
         services.AddScoped<RatingService>();
         services.AddScoped<ChatService>();
         services.AddScoped<PhotoService>();
