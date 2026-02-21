@@ -1,0 +1,246 @@
+@page "/session/{SessionId:guid}"
+@attribute [Authorize]
+@implements IAsyncDisposable
+
+<PageTitle>Rating Session - RatingApp</PageTitle>
+
+<div class="session-page">
+
+    @if (_loading)
+    {
+        <div class="empty-state">
+            <div class="spinner-border" style="color:#FD297B" role="status"></div>
+            <p style="margin-top:1rem;color:var(--muted)">Loading session...</p>
+        </div>
+    }
+    else if (_session is null)
+    {
+        <div class="empty-state">
+            <p>Session not found or you are not a participant.</p>
+        </div>
+    }
+    else
+    {
+        <!-- Header -->
+        <div class="session-header">
+            <div>
+                <h2>@(_session.Title ?? $"Session: {_session.CandidateDisplayName}")</h2>
+                <span class="session-status session-status--@_session.Status.ToLower()">@_session.Status</span>
+            </div>
+            @if (_isCreator && _session.Status == "Active")
+            {
+                <div class="session-controls">
+                    <button class="btn-session-lock" @onclick="LockSession" disabled="@_busy">Lock</button>
+                    <button class="btn-session-finalize" @onclick="FinalizeSession" disabled="@_busy">Finalize</button>
+                </div>
+            }
+        </div>
+
+        <div class="session-body">
+
+            <!-- Participant ratings panel -->
+            <div class="session-ratings-panel">
+                <h3>Participants (@_ratings.Count)</h3>
+
+                @foreach (var r in _ratings)
+                {
+                    <div class="participant-tile @(r.Score.HasValue ? "rated" : "pending")">
+                        <div class="participant-name">@r.RaterDisplayName</div>
+                        @if (r.Score.HasValue)
+                        {
+                            <div class="participant-score">@r.Score / 10</div>
+                            @if (!string.IsNullOrWhiteSpace(r.Notes))
+                            {
+                                <div class="participant-notes">@r.Notes</div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="participant-pending">Reviewing...</div>
+                        }
+                    </div>
+                }
+
+                <!-- My rating input -->
+                @if (_session.Status == "Active" || _session.Status == "Locked")
+                {
+                    <div class="my-rating-input">
+                        <label>Your Rating</label>
+                        <div class="rating-score">@_myScore</div>
+                        <input type="range" class="tinder-range" min="1" max="10" step="1"
+                               value="@_myScore"
+                               @onchange="e => _myScore = int.Parse(e.Value!.ToString()!)" />
+                        <textarea class="rating-notes" placeholder="Notes (optional)"
+                                  @bind="_myNotes" rows="2"></textarea>
+                        <button class="btn-session-rate" @onclick="SubmitOrUpdateRating" disabled="@(_busy || _session.Status == "Locked")">
+                            @(_myRatingSubmitted ? "Update" : "Submit") Rating
+                        </button>
+                    </div>
+                }
+            </div>
+
+            <!-- Chat panel -->
+            <div class="session-chat-panel">
+                <h3>Session Chat</h3>
+
+                <div class="chat-messages" id="chat-scroll">
+                    @foreach (var msg in _messages)
+                    {
+                        <div class="chat-bubble @(msg.SenderUserId == _myUserId ? "mine" : "theirs")">
+                            <div class="chat-sender">@msg.SenderDisplayName</div>
+                            <div class="chat-content">@msg.Content</div>
+                            <div class="chat-time">@msg.SentAt.ToLocalTime().ToString("HH:mm")</div>
+                        </div>
+                    }
+                </div>
+
+                @if (_session.Status != "Finalized")
+                {
+                    <div class="chat-input-row">
+                        <input class="chat-input" placeholder="Type a message..."
+                               @bind="_chatDraft" @bind:event="oninput"
+                               @onkeydown="OnChatKeyDown" />
+                        <button class="btn-chat-send" @onclick="SendChatMessage" disabled="@(string.IsNullOrWhiteSpace(_chatDraft) || _busy)">
+                            <i class="bi bi-send-fill"></i>
+                        </button>
+                    </div>
+                }
+            </div>
+
+        </div>
+    }
+
+</div>
+
+@code {
+    [Parameter] public Guid SessionId { get; set; }
+
+    [Inject] private SessionApiService SessionService { get; set; } = default!;
+    [Inject] private AuthApiService AuthService { get; set; } = default!;
+    [Inject] private NavigationManager Nav { get; set; } = default!;
+
+    private SessionDto? _session;
+    private List<ParticipantRatingDto> _ratings = new();
+    private List<SessionChatMessageDto> _messages = new();
+
+    private Guid _myUserId;
+    private bool _isCreator;
+    private bool _myRatingSubmitted;
+    private int _myScore = 7;
+    private string? _myNotes;
+    private string? _chatDraft;
+    private bool _loading = true;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Wire up real-time events before joining
+        SessionService.OnRatingSubmitted += OnRatingSubmitted;
+        SessionService.OnRatingUpdated += OnRatingUpdated;
+        SessionService.OnChatMessage += OnChatMessageReceived;
+
+        _session = await SessionService.GetSessionAsync(SessionId);
+        if (_session is null) { _loading = false; return; }
+
+        _ratings = _session.ParticipantRatings.ToList();
+
+        var token = await AuthService.GetTokenAsync();
+        var baseUri = Nav.BaseUri.TrimEnd('/');
+        await SessionService.ConnectAsync($"{baseUri}/hubs/rating", token ?? string.Empty);
+
+        var state = await SessionService.GetSessionStateAsync(SessionId);
+        if (state is not null)
+        {
+            _ratings = state.ParticipantRatings.ToList();
+            _messages = state.RecentMessages.ToList();
+        }
+
+        await SessionService.JoinSessionAsync(SessionId);
+
+        var profile = await AuthService.GetProfileAsync();
+        _myUserId = profile?.UserId ?? Guid.Empty;
+        _isCreator = _session.CreatorId == _myUserId;
+        _myRatingSubmitted = _ratings.Any(r => r.RaterUserId == _myUserId && r.Score.HasValue);
+
+        _loading = false;
+    }
+
+    private void OnRatingSubmitted(ParticipantRatingDto dto)
+    {
+        MergeRating(dto);
+        if (dto.RaterUserId == _myUserId) _myRatingSubmitted = true;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnRatingUpdated(ParticipantRatingDto dto)
+    {
+        MergeRating(dto);
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnChatMessageReceived(SessionChatMessageDto dto)
+    {
+        _messages.Add(dto);
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void MergeRating(ParticipantRatingDto dto)
+    {
+        var idx = _ratings.FindIndex(r => r.RaterUserId == dto.RaterUserId);
+        if (idx >= 0) _ratings[idx] = dto;
+        else _ratings.Add(dto);
+    }
+
+    private async Task SubmitOrUpdateRating()
+    {
+        _busy = true;
+        try
+        {
+            if (_myRatingSubmitted)
+                await SessionService.UpdateRatingAsync(SessionId, new UpdateSessionRatingRequest(_myScore, _myNotes));
+            else
+                await SessionService.SubmitRatingAsync(SessionId, new SubmitSessionRatingRequest(_myScore, _myNotes));
+        }
+        finally { _busy = false; }
+    }
+
+    private async Task SendChatMessage()
+    {
+        if (string.IsNullOrWhiteSpace(_chatDraft)) return;
+        var content = _chatDraft;
+        _chatDraft = string.Empty;
+        await SessionService.SendChatMessageAsync(SessionId, content);
+    }
+
+    private async Task OnChatKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+            await SendChatMessage();
+    }
+
+    private async Task LockSession()
+    {
+        _busy = true;
+        await SessionService.LockSessionAsync(SessionId);
+        _session = await SessionService.GetSessionAsync(SessionId);
+        _busy = false;
+    }
+
+    private async Task FinalizeSession()
+    {
+        _busy = true;
+        await SessionService.FinalizeSessionAsync(SessionId);
+        _session = await SessionService.GetSessionAsync(SessionId);
+        _busy = false;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        SessionService.OnRatingSubmitted -= OnRatingSubmitted;
+        SessionService.OnRatingUpdated -= OnRatingUpdated;
+        SessionService.OnChatMessage -= OnChatMessageReceived;
+
+        await SessionService.LeaveSessionAsync(SessionId);
+        await SessionService.DisposeAsync();
+    }
+}
