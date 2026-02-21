@@ -36,6 +36,22 @@ public abstract class ApiTestBase : IDisposable
         db.SaveChanges();
     }
 
+    /// <summary>
+    /// Builds a multi-criteria rating payload scoring all three seeded criteria at
+    /// the same <paramref name="score"/>. Replaces the old single-score format.
+    /// </summary>
+    protected object RatingPayload(Guid ratedUserId, int score) => new
+    {
+        ratedUserId,
+        criteria = new[]
+        {
+            new { criterionId = SkillCriterionId,   score },
+            new { criterionId = CommCriterionId,    score },
+            new { criterionId = CultureCriterionId, score }
+        },
+        comment = (string?)null
+    };
+
     protected HttpClient CreateAuthenticatedClient(string token)
     {
         var client = Factory.CreateClient();

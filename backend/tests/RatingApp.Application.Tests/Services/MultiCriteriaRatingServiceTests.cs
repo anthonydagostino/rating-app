@@ -228,6 +228,130 @@ public class MultiCriteriaRatingServiceTests
         summary.AverageScore.Should().Be(8.0);
     }
 
+    // --- Rounding boundary ---
+
+    [Fact]
+    public async Task AddRating_AggregateBankersRoundsTo6_NoMatch()
+    {
+        var (svc, alice, bob) = await SetupAsync();
+
+        // 6*0.40 + 6*0.35 + 8*0.25 = 2.40 + 2.10 + 2.00 = 6.5
+        // Math.Round(6.5) = 6 (banker's rounding → rounds to even) → below threshold
+        await svc.AddRating(alice.Id, MakeDto(bob.Id, 6, 6, 8));
+        var matchId = await svc.AddRating(bob.Id, MakeDto(alice.Id, 9, 9, 9));
+
+        matchId.Should().BeNull("aggregate of 6.5 rounds to 6 via banker's rounding, below match threshold");
+    }
+
+    [Fact]
+    public async Task AddRating_AggregateRoundsUpTo7_CreatesMatch()
+    {
+        var (svc, alice, bob) = await SetupAsync();
+
+        // 6*0.40 + 7*0.35 + 7*0.25 = 2.40 + 2.45 + 1.75 = 6.6
+        // Math.Round(6.6) = 7 → at threshold → match
+        await svc.AddRating(alice.Id, MakeDto(bob.Id, 6, 7, 7));
+        var matchId = await svc.AddRating(bob.Id, MakeDto(alice.Id, 9, 9, 9));
+
+        matchId.Should().NotBeNull("aggregate of 6.6 rounds to 7, which meets the match threshold");
+    }
+
+    // --- Rating updates ---
+
+    [Fact]
+    public async Task AddRating_UpdateFromBelowToAboveThreshold_CreatesMatch()
+    {
+        var (svc, alice, bob) = await SetupAsync();
+
+        // Alice rates Bob below threshold; Bob rates Alice above → no match yet
+        await svc.AddRating(alice.Id, MakeDto(bob.Id, 4, 4, 4));
+        await svc.AddRating(bob.Id, MakeDto(alice.Id, 9, 9, 9));
+
+        // Alice re-rates Bob above threshold → both sides now qualify → match
+        var matchId = await svc.AddRating(alice.Id, MakeDto(bob.Id, 8, 8, 8));
+
+        matchId.Should().NotBeNull("updating Alice's rating above threshold should trigger a match");
+    }
+
+    [Fact]
+    public async Task AddRating_MatchAlreadyExists_ReturnsExistingMatchId()
+    {
+        var (svc, alice, bob) = await SetupAsync();
+
+        await svc.AddRating(alice.Id, MakeDto(bob.Id, 8, 8, 8));
+        var firstMatchId = await svc.AddRating(bob.Id, MakeDto(alice.Id, 9, 9, 9));
+
+        // Alice re-rates — match already exists; no duplicate should be created
+        var secondMatchId = await svc.AddRating(alice.Id, MakeDto(bob.Id, 10, 10, 10));
+
+        firstMatchId.Should().NotBeNull();
+        secondMatchId.Should().Be(firstMatchId, "re-rating when a match exists should return the existing match ID");
+    }
+
+    // --- Optional criteria ---
+
+    [Fact]
+    public async Task AddRating_OptionalCriterionOmitted_Succeeds()
+    {
+        var (svc, alice, bob) = await SetupAsync();
+
+        // Skill + Communication are required; Culture is optional and omitted here
+        var dto = new RatingCreateDto(bob.Id, new List<RatingCriterionScoreDto>
+        {
+            new(SkillId, 8),
+            new(CommId,  8)
+        }, null);
+
+        var act = () => svc.AddRating(alice.Id, dto);
+
+        await act.Should().NotThrowAsync("optional criteria may be omitted from a submission");
+    }
+
+    // --- Comment persistence ---
+
+    [Fact]
+    public async Task AddRating_CommentStoredOnNewRating()
+    {
+        var db = InMemoryDbFactory.Create();
+        db.RatingCriteria.AddRange(
+            new RatingCriterion { Id = SkillId,   Name = "Skill",         Weight = 0.40, IsRequired = true,  IsActive = true },
+            new RatingCriterion { Id = CommId,     Name = "Communication", Weight = 0.35, IsRequired = true,  IsActive = true },
+            new RatingCriterion { Id = CultureId,  Name = "Culture",       Weight = 0.25, IsRequired = false, IsActive = true }
+        );
+        var alice = MakeUser();
+        var bob   = MakeUser();
+        db.Users.AddRange(alice, bob);
+        await db.SaveChangesAsync();
+        var svc = new RatingService(db, NullLogger<RatingService>.Instance);
+
+        await svc.AddRating(alice.Id, MakeDto(bob.Id, 8, 8, 8, comment: "Great person!"));
+
+        var rating = db.Ratings.Single(r => r.RaterUserId == alice.Id);
+        rating.Comment.Should().Be("Great person!");
+    }
+
+    [Fact]
+    public async Task AddRating_CommentUpdatedOnResubmit()
+    {
+        var db = InMemoryDbFactory.Create();
+        db.RatingCriteria.AddRange(
+            new RatingCriterion { Id = SkillId,   Name = "Skill",         Weight = 0.40, IsRequired = true,  IsActive = true },
+            new RatingCriterion { Id = CommId,     Name = "Communication", Weight = 0.35, IsRequired = true,  IsActive = true },
+            new RatingCriterion { Id = CultureId,  Name = "Culture",       Weight = 0.25, IsRequired = false, IsActive = true }
+        );
+        var alice = MakeUser();
+        var bob   = MakeUser();
+        db.Users.AddRange(alice, bob);
+        await db.SaveChangesAsync();
+        var svc = new RatingService(db, NullLogger<RatingService>.Instance);
+
+        await svc.AddRating(alice.Id, MakeDto(bob.Id, 8, 8, 8, comment: "Initial comment"));
+        await svc.AddRating(alice.Id, MakeDto(bob.Id, 9, 9, 9, comment: "Updated comment"));
+
+        var rating = db.Ratings.Single(r => r.RaterUserId == alice.Id);
+        rating.Comment.Should().Be("Updated comment");
+    }
+
     // --- GetCriteriaAsync ---
 
     [Fact]
@@ -239,5 +363,36 @@ public class MultiCriteriaRatingServiceTests
 
         criteria.Should().HaveCount(3);
         criteria.Should().AllSatisfy(c => c.Id.Should().NotBeEmpty());
+    }
+
+    [Fact]
+    public async Task GetCriteriaAsync_InactiveCriterionExcluded()
+    {
+        var db = InMemoryDbFactory.Create();
+        var inactiveId = Guid.NewGuid();
+        db.RatingCriteria.AddRange(
+            new RatingCriterion { Id = SkillId,    Name = "Skill",         Weight = 0.40, IsRequired = true,  IsActive = true  },
+            new RatingCriterion { Id = CommId,     Name = "Communication", Weight = 0.35, IsRequired = true,  IsActive = true  },
+            new RatingCriterion { Id = CultureId,  Name = "Culture",       Weight = 0.25, IsRequired = false, IsActive = true  },
+            new RatingCriterion { Id = inactiveId, Name = "Hidden",        Weight = 0.10, IsRequired = false, IsActive = false }
+        );
+        await db.SaveChangesAsync();
+        var svc = new RatingService(db, NullLogger<RatingService>.Instance);
+
+        var criteria = await svc.GetCriteriaAsync();
+
+        criteria.Should().HaveCount(3, "inactive criteria must not be returned");
+        criteria.Should().NotContain(c => c.Id == inactiveId);
+    }
+
+    [Fact]
+    public async Task GetCriteriaAsync_ReturnedInWeightDescendingOrder()
+    {
+        var (svc, _, _) = await SetupAsync();
+
+        var criteria = await svc.GetCriteriaAsync();
+
+        // Expected order: Skill (0.40) → Communication (0.35) → Culture (0.25)
+        criteria.Select(c => c.Weight).Should().BeInDescendingOrder();
     }
 }
