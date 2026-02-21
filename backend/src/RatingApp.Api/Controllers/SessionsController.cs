@@ -40,40 +40,23 @@ public class SessionsController : ControllerBase
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetSession(Guid id)
     {
-        try
-        {
-            var session = await _sessionService.GetSessionAsync(id, CurrentUserId);
-            return Ok(session);
-        }
-        catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
-        catch (UnauthorizedAccessException ex) { return Forbid(ex.Message); }
+        var session = await _sessionService.GetSessionAsync(id, CurrentUserId);
+        return Ok(session);
     }
 
     /// <summary>POST /api/sessions/{id}/lock — Lock the session (creator only).</summary>
     [HttpPost("{id:guid}/lock")]
     public async Task<IActionResult> LockSession(Guid id)
     {
-        try
-        {
-            await _sessionService.LockSessionAsync(id, CurrentUserId);
-            return NoContent();
-        }
-        catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
-        catch (UnauthorizedAccessException ex) { return Forbid(ex.Message); }
-        catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
+        await _sessionService.LockSessionAsync(id, CurrentUserId);
+        return NoContent();
     }
 
     /// <summary>POST /api/sessions/{id}/finalize — Finalize and persist aggregate rating (creator only).</summary>
     [HttpPost("{id:guid}/finalize")]
     public async Task<IActionResult> FinalizeSession(Guid id)
     {
-        try
-        {
-            await _sessionService.FinalizeSessionAsync(id, CurrentUserId);
-            return NoContent();
-        }
-        catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
-        catch (UnauthorizedAccessException ex) { return Forbid(ex.Message); }
-        catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
+        await _sessionService.FinalizeSessionAsync(id, CurrentUserId);
+        return NoContent();
     }
 }
