@@ -107,15 +107,9 @@
                     <label>Age</label>
                     <input class="tinder-input" value="@_profile.Age" disabled />
                 </div>
-                <div class="row-fields">
-                    <div class="form-field">
-                        <label>Latitude</label>
-                        <InputNumber @bind-Value="_editModel.Latitude" class="tinder-input" />
-                    </div>
-                    <div class="form-field">
-                        <label>Longitude</label>
-                        <InputNumber @bind-Value="_editModel.Longitude" class="tinder-input" />
-                    </div>
+                <div class="form-field">
+                    <label>Location</label>
+                    <LocationPicker @bind-Latitude="_editModel.Latitude" @bind-Longitude="_editModel.Longitude" />
                 </div>
                 @if (_profileMessage is not null)
                 {

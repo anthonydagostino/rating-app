@@ -34,19 +34,10 @@
                        @onchange="OnBirthdateChanged"
                        max="@MaxBirthdateString" />
             </div>
-            <div class="row-fields">
-                <div class="form-field">
-                    <label>Latitude</label>
-                    <InputNumber @bind-Value="_model.Latitude" class="tinder-input" />
-                </div>
-                <div class="form-field">
-                    <label>Longitude</label>
-                    <InputNumber @bind-Value="_model.Longitude" class="tinder-input" />
-                </div>
+            <div class="form-field">
+                <label>Location</label>
+                <LocationPicker @bind-Latitude="_model.Latitude" @bind-Longitude="_model.Longitude" />
             </div>
-            <small style="display:block;color:var(--muted);font-size:0.75rem;margin-bottom:1rem;">
-                Default: New York City (40.71, -74.01)
-            </small>
 
             @if (_error is not null)
             {
@@ -92,6 +83,13 @@
             return;
         }
 
+        if (_model.Latitude == 0 && _model.Longitude == 0)
+        {
+            _error = "Please select a location.";
+            _loading = false;
+            return;
+        }
+
         var req = new RegisterRequest(
             _model.Email, _model.Password, _model.DisplayName,
             _model.Gender, birthdate, _model.Latitude, _model.Longitude);
@@ -113,7 +111,7 @@
         public string DisplayName { get; set; } = "";
         public int Gender { get; set; } = 1;
         public string BirthdateString { get; set; } = "1995-01-01";
-        public double Latitude { get; set; } = 40.7128;
-        public double Longitude { get; set; } = -74.0060;
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
     }
 }

@@ -1,0 +1,143 @@
+@inject IJSRuntime JS
+@inject GeocodingService GeocodingService
+
+<div class="location-picker">
+
+    <button type="button" class="btn-location-gps" @onclick="UseCurrentLocation" disabled="@_gpsLoading">
+        @if (_gpsLoading)
+        {
+            <span class="spinner-border spinner-border-sm me-1"></span>
+            <span>Detecting location...</span>
+        }
+        else
+        {
+            <i class="bi bi-crosshair2"></i>
+            <span> Use My Current Location</span>
+        }
+    </button>
+
+    <div class="location-divider">— or search —</div>
+
+    <div class="location-search-wrap">
+        <input type="text"
+               class="tinder-input"
+               placeholder="Search city or town..."
+               value="@_query"
+               @oninput="OnSearchInput"
+               autocomplete="off" />
+
+        @if (_suggestions.Count > 0)
+        {
+            <div class="location-dropdown">
+                @foreach (var s in _suggestions)
+                {
+                    var loc = s;
+                    <div class="location-dropdown-item" @onclick="() => SelectLocation(loc)">
+                        <i class="bi bi-geo-alt"></i>
+                        <span>@loc.DisplayName</span>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    @if (!string.IsNullOrEmpty(_selectedName))
+    {
+        <div class="location-selected">
+            <i class="bi bi-check-circle-fill"></i>
+            <span>@_selectedName</span>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div style="color:#FD297B;font-size:0.8rem;margin-top:0.4rem">@_error</div>
+    }
+
+</div>
+
+@code {
+    [Parameter] public double Latitude { get; set; }
+    [Parameter] public EventCallback<double> LatitudeChanged { get; set; }
+    [Parameter] public double Longitude { get; set; }
+    [Parameter] public EventCallback<double> LongitudeChanged { get; set; }
+
+    private string _query = "";
+    private List<GeocodingResult> _suggestions = [];
+    private string? _selectedName;
+    private bool _gpsLoading;
+    private string? _error;
+    private bool _didInitialGeocode;
+    private CancellationTokenSource _cts = new();
+
+    // When the parent loads lat/lon from an existing profile, reverse-geocode to show city name.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_didInitialGeocode && (Latitude != 0 || Longitude != 0) && string.IsNullOrEmpty(_selectedName))
+        {
+            _didInitialGeocode = true;
+            _selectedName = await GeocodingService.ReverseGeocodeAsync(Latitude, Longitude);
+            StateHasChanged();
+        }
+    }
+
+    private async Task UseCurrentLocation()
+    {
+        _gpsLoading = true;
+        _error = null;
+        StateHasChanged();
+
+        try
+        {
+            var coords = await JS.InvokeAsync<GeolocationCoords>("getGeolocation");
+            await LatitudeChanged.InvokeAsync(coords.Latitude);
+            await LongitudeChanged.InvokeAsync(coords.Longitude);
+            _didInitialGeocode = true;
+            _selectedName = await GeocodingService.ReverseGeocodeAsync(coords.Latitude, coords.Longitude);
+            _suggestions.Clear();
+            _query = "";
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message.Contains("denied", StringComparison.OrdinalIgnoreCase)
+                ? "Location access denied. Please allow it in your browser settings."
+                : "Could not get your location. Try searching for your city below.";
+        }
+        finally
+        {
+            _gpsLoading = false;
+        }
+    }
+
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        _query = e.Value?.ToString() ?? "";
+        _suggestions.Clear();
+
+        _cts.Cancel();
+        _cts = new CancellationTokenSource();
+        var token = _cts.Token;
+
+        if (_query.Length < 2) return;
+
+        try
+        {
+            await Task.Delay(350, token);
+            _suggestions = await GeocodingService.SearchAsync(_query);
+            StateHasChanged();
+        }
+        catch (TaskCanceledException) { }
+    }
+
+    private async Task SelectLocation(GeocodingResult location)
+    {
+        await LatitudeChanged.InvokeAsync(location.Latitude);
+        await LongitudeChanged.InvokeAsync(location.Longitude);
+        _didInitialGeocode = true;
+        _selectedName = location.DisplayName;
+        _query = "";
+        _suggestions.Clear();
+    }
+
+    private sealed record GeolocationCoords(double Latitude, double Longitude);
+}
