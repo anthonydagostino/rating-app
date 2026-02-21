@@ -85,24 +85,59 @@
         </div>
 
         <div class="rating-card">
-            <div class="rating-score">@_score</div>
-            <div class="rating-score-label">out of 10</div>
-            <input type="range" class="tinder-range" min="1" max="10" step="1"
-                   value="@_score"
-                   @onchange="e => _score = int.Parse(e.Value!.ToString()!)" />
-            <div class="rating-range-labels">
-                <span>Not interested</span>
-                <span>Perfect match</span>
-            </div>
+            @if (_criteria.Count == 0)
+            {
+                <p style="color:var(--muted);text-align:center">Loading criteria...</p>
+            }
+            else
+            {
+                @foreach (var criterion in _criteria)
+                {
+                    var score = _criteriaScores[criterion.Id];
+                    <div class="criterion-row" style="margin-bottom:1rem">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem">
+                            <span class="criterion-name" style="font-weight:600;font-size:0.95rem">
+                                @criterion.Name
+                                @if (criterion.IsRequired)
+                                {
+                                    <span style="color:#FD297B;margin-left:2px">*</span>
+                                }
+                            </span>
+                            <span class="criterion-score-badge" style="font-weight:700;color:#FD297B;min-width:1.5rem;text-align:right">
+                                @score
+                            </span>
+                        </div>
+                        <input type="range" class="tinder-range" min="1" max="10" step="1"
+                               value="@score"
+                               @onchange="e => OnCriterionScoreChanged(criterion.Id, e.Value!.ToString()!)" />
+                        <div class="rating-range-labels" style="font-size:0.75rem">
+                            <span>Not interested</span>
+                            <span>Perfect match</span>
+                        </div>
+                    </div>
+                }
+
+                <div class="aggregate-preview" style="margin-top:1.25rem;padding:0.75rem 1rem;background:rgba(253,41,123,0.06);border-radius:12px;display:flex;align-items:center;justify-content:space-between">
+                    <span style="font-size:0.9rem;color:var(--muted)">Weighted score</span>
+                    <span style="font-size:1.4rem;font-weight:700;color:#FD297B">@_liveAggregate.ToString("F1")</span>
+                </div>
+
+                <div style="margin-top:1rem">
+                    <textarea class="form-control" placeholder="Add a comment (optional, max 500 chars)"
+                              maxlength="500" rows="2"
+                              style="resize:none;border-radius:10px;font-size:0.9rem"
+                              @bind="_comment"></textarea>
+                </div>
+            }
         </div>
 
         <div class="action-row">
             <button class="action-btn-skip" @onclick="Skip" title="Skip">
                 <i class="bi bi-x-lg"></i>
             </button>
-            <button class="action-btn-rate" @onclick="SubmitRating" disabled="@_submitting">
+            <button class="action-btn-rate" @onclick="SubmitRating" disabled="@(_submitting || _criteria.Count == 0)">
                 <i class="bi bi-heart-fill"></i>
-                @(_submitting ? "Rating..." : $"Rate {_score}/10")
+                @(_submitting ? "Rating..." : $"Rate {_liveAggregate:F1}/10")
             </button>
         </div>
 
@@ -121,17 +156,46 @@
 
     private readonly Queue<CandidateDto> _queue = new();
     private CandidateDto? _current;
-    private int _score = 7;
     private int _photoIndex = 0;
     private bool _loading = true;
     private bool _submitting;
     private string? _matchMessage;
     private bool _allLoaded;
 
+    private List<CriterionModel> _criteria = new();
+    private Dictionary<Guid, int> _criteriaScores = new();
+    private string? _comment;
+
+    private double _liveAggregate => ComputeAggregate();
+
     protected override async Task OnInitializedAsync()
     {
+        _criteria = await RatingService.GetCriteriaAsync();
+        ResetScores();
+
         await LoadMoreCandidates(showLoading: true);
         Advance();
+    }
+
+    private void ResetScores()
+    {
+        _criteriaScores = _criteria.ToDictionary(c => c.Id, _ => 7);
+        _comment = null;
+    }
+
+    private void OnCriterionScoreChanged(Guid criterionId, string rawValue)
+    {
+        if (int.TryParse(rawValue, out var score))
+            _criteriaScores[criterionId] = score;
+    }
+
+    private double ComputeAggregate()
+    {
+        if (_criteria.Count == 0) return 0;
+        double totalWeight = _criteria.Sum(c => c.Weight);
+        if (totalWeight == 0) return 0;
+        double weighted = _criteria.Sum(c => _criteriaScores.TryGetValue(c.Id, out var s) ? s * c.Weight : 0);
+        return Math.Round(weighted / totalWeight, 1);
     }
 
     private async Task LoadMoreCandidates(bool showLoading = false)
@@ -151,8 +215,8 @@
     private void Advance()
     {
         _current = _queue.Count > 0 ? _queue.Dequeue() : null;
-        _score = 7;
         _photoIndex = 0;
+        ResetScores();
 
         if (_queue.Count <= 2 && !_allLoaded)
             _ = LoadMoreCandidates();
@@ -171,14 +235,18 @@
 
     private async Task SubmitRating()
     {
-        if (_current is null) return;
+        if (_current is null || _criteria.Count == 0) return;
         _submitting = true;
 
-        var result = await RatingService.SubmitRatingAsync(_current.UserId, _score);
+        var criteriaScores = _criteria
+            .Select(c => new CriterionScoreModel(c.Id, _criteriaScores[c.Id]))
+            .ToList();
+
+        var result = await RatingService.SubmitRatingAsync(_current.UserId, criteriaScores, _comment);
 
         if (result?.MatchCreated == true)
         {
-            _matchMessage = $"You and {_current.DisplayName} both rated each other 7+!";
+            _matchMessage = $"You and {_current.DisplayName} both rated each other highly!";
             _ = ClearMatchMessageAfterDelay();
         }
 

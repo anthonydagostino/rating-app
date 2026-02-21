@@ -12,10 +12,10 @@ namespace RatingApp.Api.Controllers;
 [Authorize]
 public class RatingsController : ControllerBase
 {
-    private readonly RatingService _ratingService;
-    private readonly IValidator<SubmitRatingRequest> _validator;
+    private readonly IRatingService _ratingService;
+    private readonly IValidator<RatingCreateDto> _validator;
 
-    public RatingsController(RatingService ratingService, IValidator<SubmitRatingRequest> validator)
+    public RatingsController(IRatingService ratingService, IValidator<RatingCreateDto> validator)
         => (_ratingService, _validator) = (ratingService, validator);
 
     private Guid CurrentUserId =>
@@ -23,8 +23,15 @@ public class RatingsController : ControllerBase
             ?? User.FindFirstValue("sub")
             ?? throw new InvalidOperationException("User ID claim not found."));
 
+    [HttpGet("criteria")]
+    public async Task<IActionResult> GetCriteria()
+    {
+        var criteria = await _ratingService.GetCriteriaAsync();
+        return Ok(criteria);
+    }
+
     [HttpPost]
-    public async Task<IActionResult> SubmitRating([FromBody] SubmitRatingRequest req)
+    public async Task<IActionResult> SubmitRating([FromBody] RatingCreateDto req)
     {
         var validation = await _validator.ValidateAsync(req);
         if (!validation.IsValid)
@@ -32,12 +39,19 @@ public class RatingsController : ControllerBase
 
         try
         {
-            var matchId = await _ratingService.SubmitRatingAsync(CurrentUserId, req);
+            var matchId = await _ratingService.AddRating(CurrentUserId, req);
             return Ok(new { matchCreated = matchId.HasValue, matchId });
         }
         catch (InvalidOperationException ex)
         {
             return BadRequest(new { message = ex.Message });
         }
+    }
+
+    [HttpGet("candidates/{id:guid}/aggregate")]
+    public async Task<IActionResult> GetAggregate(Guid id)
+    {
+        var aggregate = await _ratingService.GetAggregatedScores(id);
+        return Ok(aggregate);
     }
 }

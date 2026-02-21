@@ -38,8 +38,8 @@ public class ChatsIntegrationTests : ApiTestBase
         // Mutual high ratings → creates match + chat
         var authedA = CreateAuthenticatedClient(tokenA);
         var authedB = CreateAuthenticatedClient(tokenB);
-        await authedA.PostAsJsonAsync("/api/ratings", new { ratedUserId = userBId, score = 8 });
-        await authedB.PostAsJsonAsync("/api/ratings", new { ratedUserId = userAId, score = 9 });
+        await authedA.PostAsJsonAsync("/api/ratings", RatingPayload(userBId, 8));
+        await authedB.PostAsJsonAsync("/api/ratings", RatingPayload(userAId, 9));
 
         var response = await authedA.GetAsync("/api/chats");
 
@@ -79,12 +79,13 @@ public class ChatsIntegrationTests : ApiTestBase
 
         var authedA = CreateAuthenticatedClient(tokenA);
         var authedB = CreateAuthenticatedClient(tokenB);
-        await authedA.PostAsJsonAsync("/api/ratings", new { ratedUserId = userBId, score = 8 });
-        await authedB.PostAsJsonAsync("/api/ratings", new { ratedUserId = userAId, score = 8 });
+        await authedA.PostAsJsonAsync("/api/ratings", RatingPayload(userBId, 8));
+        await authedB.PostAsJsonAsync("/api/ratings", RatingPayload(userAId, 8));
 
         // Get chat ID
         var chatsResponse = await authedA.GetAsync("/api/chats");
-        var chats = await chatsResponse.Content.ReadFromJsonAsync<List<ChatSummaryResponse>>()
+        var chats =
+            await chatsResponse.Content.ReadFromJsonAsync<List<ChatSummaryResponse>>()
             ?? throw new InvalidOperationException("No chats returned");
         var chatId = chats[0].ChatId;
 
@@ -103,11 +104,12 @@ public class ChatsIntegrationTests : ApiTestBase
 
         var authedA = CreateAuthenticatedClient(tokenA);
         var authedB = CreateAuthenticatedClient(tokenB);
-        await authedA.PostAsJsonAsync("/api/ratings", new { ratedUserId = userBId, score = 8 });
-        await authedB.PostAsJsonAsync("/api/ratings", new { ratedUserId = userAId, score = 8 });
+        await authedA.PostAsJsonAsync("/api/ratings", RatingPayload(userBId, 8));
+        await authedB.PostAsJsonAsync("/api/ratings", RatingPayload(userAId, 8));
 
-        var chats = await (await authedA.GetAsync("/api/chats"))
-            .Content.ReadFromJsonAsync<List<ChatSummaryResponse>>()
+        var chats =
+            await (await authedA.GetAsync("/api/chats"))
+                .Content.ReadFromJsonAsync<List<ChatSummaryResponse>>()
             ?? throw new InvalidOperationException();
         var chatId = chats[0].ChatId;
 
@@ -125,7 +127,8 @@ public class ChatsIntegrationTests : ApiTestBase
     {
         var response = await Client.PostAsJsonAsync(
             $"/api/chats/{Guid.NewGuid()}/messages",
-            new { content = "Hello" });
+            new { content = "Hello" }
+        );
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
@@ -137,17 +140,19 @@ public class ChatsIntegrationTests : ApiTestBase
 
         var authedA = CreateAuthenticatedClient(tokenA);
         var authedB = CreateAuthenticatedClient(tokenB);
-        await authedA.PostAsJsonAsync("/api/ratings", new { ratedUserId = userBId, score = 9 });
-        await authedB.PostAsJsonAsync("/api/ratings", new { ratedUserId = userAId, score = 9 });
+        await authedA.PostAsJsonAsync("/api/ratings", RatingPayload(userBId, 9));
+        await authedB.PostAsJsonAsync("/api/ratings", RatingPayload(userAId, 9));
 
-        var chats = await (await authedA.GetAsync("/api/chats"))
-            .Content.ReadFromJsonAsync<List<ChatSummaryResponse>>()
+        var chats =
+            await (await authedA.GetAsync("/api/chats"))
+                .Content.ReadFromJsonAsync<List<ChatSummaryResponse>>()
             ?? throw new InvalidOperationException();
         var chatId = chats[0].ChatId;
 
         var response = await authedA.PostAsJsonAsync(
             $"/api/chats/{chatId}/messages",
-            new { content = "Hello!" });
+            new { content = "Hello!" }
+        );
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadAsStringAsync();
@@ -163,15 +168,19 @@ public class ChatsIntegrationTests : ApiTestBase
 
         var authedA = CreateAuthenticatedClient(tokenA);
         var authedB = CreateAuthenticatedClient(tokenB);
-        await authedA.PostAsJsonAsync("/api/ratings", new { ratedUserId = userBId, score = 9 });
-        await authedB.PostAsJsonAsync("/api/ratings", new { ratedUserId = userAId, score = 9 });
+        await authedA.PostAsJsonAsync("/api/ratings", RatingPayload(userBId, 9));
+        await authedB.PostAsJsonAsync("/api/ratings", RatingPayload(userAId, 9));
 
-        var chats = await (await authedA.GetAsync("/api/chats"))
-            .Content.ReadFromJsonAsync<List<ChatSummaryResponse>>()
+        var chats =
+            await (await authedA.GetAsync("/api/chats"))
+                .Content.ReadFromJsonAsync<List<ChatSummaryResponse>>()
             ?? throw new InvalidOperationException();
         var chatId = chats[0].ChatId;
 
-        await authedA.PostAsJsonAsync($"/api/chats/{chatId}/messages", new { content = "Hey there!" });
+        await authedA.PostAsJsonAsync(
+            $"/api/chats/{chatId}/messages",
+            new { content = "Hey there!" }
+        );
 
         var messagesResponse = await authedA.GetAsync($"/api/chats/{chatId}/messages");
         var body = await messagesResponse.Content.ReadAsStringAsync();
@@ -186,22 +195,29 @@ public class ChatsIntegrationTests : ApiTestBase
 
         var authedA = CreateAuthenticatedClient(tokenA);
         var authedB = CreateAuthenticatedClient(tokenB);
-        await authedA.PostAsJsonAsync("/api/ratings", new { ratedUserId = userBId, score = 9 });
-        await authedB.PostAsJsonAsync("/api/ratings", new { ratedUserId = userAId, score = 9 });
+        await authedA.PostAsJsonAsync("/api/ratings", RatingPayload(userBId, 9));
+        await authedB.PostAsJsonAsync("/api/ratings", RatingPayload(userAId, 9));
 
-        var chats = await (await authedA.GetAsync("/api/chats"))
-            .Content.ReadFromJsonAsync<List<ChatSummaryResponse>>()
+        var chats =
+            await (await authedA.GetAsync("/api/chats"))
+                .Content.ReadFromJsonAsync<List<ChatSummaryResponse>>()
             ?? throw new InvalidOperationException();
         var chatId = chats[0].ChatId;
 
         var response = await authedA.PostAsJsonAsync(
             $"/api/chats/{chatId}/messages",
-            new { content = "" });
+            new { content = "" }
+        );
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private record ChatSummaryResponse(Guid ChatId, Guid MatchId, Guid OtherUserId, string OtherUserDisplayName);
+    private record ChatSummaryResponse(
+        Guid ChatId,
+        Guid MatchId,
+        Guid OtherUserId,
+        string OtherUserDisplayName
+    );
 }

@@ -48,7 +48,7 @@ public class RegisterRequestValidatorTests
     [Fact]
     public void Email_TooLong_Fails()
     {
-        var longEmail = new string('a', 251) + "@x.com" // 257 chars > MaximumLength(256);
+        var longEmail = new string('a', 250) + "@x.com";
         var req = ValidRequest() with { Email = longEmail };
         var result = _validator.Validate(req);
         result.IsValid.Should().BeFalse();

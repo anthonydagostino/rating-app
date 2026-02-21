@@ -144,7 +144,7 @@ public class PhotosIntegrationTests : ApiTestBase
         var keepId = Guid.NewGuid();
         var deleteId = Guid.NewGuid();
         db.Photos.AddRange(
-            new Photo { Id = keepId, UserId = userId, FileName = "keep.jpg", DisplayOrder = 0, CreatedAt = DateTime.UtcNow },
+            new Photo { Id = keepId,   UserId = userId, FileName = "keep.jpg",   DisplayOrder = 0, CreatedAt = DateTime.UtcNow },
             new Photo { Id = deleteId, UserId = userId, FileName = "delete.jpg", DisplayOrder = 1, CreatedAt = DateTime.UtcNow }
         );
         await db.SaveChangesAsync();

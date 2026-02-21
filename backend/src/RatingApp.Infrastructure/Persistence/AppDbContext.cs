@@ -14,6 +14,8 @@ public class AppDbContext : DbContext
     public DbSet<Chat> Chats => Set<Chat>();
     public DbSet<Message> Messages => Set<Message>();
     public DbSet<Photo> Photos => Set<Photo>();
+    public DbSet<RatingCriterion> RatingCriteria => Set<RatingCriterion>();
+    public DbSet<RatingDetail> RatingDetails => Set<RatingDetail>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
