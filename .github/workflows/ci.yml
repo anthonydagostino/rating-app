@@ -35,12 +35,16 @@ jobs:
           dotnet test backend/tests/RatingApp.Application.Tests/RatingApp.Application.Tests.csproj
           --no-build -c Release --verbosity normal
           --logger "trx;LogFileName=unit-results.trx"
+          --collect:"XPlat Code Coverage"
+          --results-directory coverage/unit
 
       - name: Integration tests
         run: >
           dotnet test backend/tests/RatingApp.Api.IntegrationTests/RatingApp.Api.IntegrationTests.csproj
           --no-build -c Release --verbosity normal
           --logger "trx;LogFileName=integration-results.trx"
+          --collect:"XPlat Code Coverage"
+          --results-directory coverage/integration
 
       - name: Upload test results
         if: always()
@@ -48,6 +52,13 @@ jobs:
         with:
           name: test-results
           path: '**/*.trx'
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: coverage/
 
   frontend-build:
     name: Frontend — Build
