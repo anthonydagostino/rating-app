@@ -94,11 +94,13 @@ var app = builder.Build();
 // --- Middleware Pipeline ---
 app.UseMiddleware<GlobalExceptionMiddleware>();
 
-// Ensure uploads directory exists and serve static files
+// Ensure uploads directory exists
 var uploadsPath = Path.Combine(app.Environment.WebRootPath ??
     Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"), "uploads");
 Directory.CreateDirectory(uploadsPath);
-app.UseStaticFiles();
+
+// ServeUnknownFileTypes required for Blazor WASM assets (.dat, .wasm, etc.)
+app.UseStaticFiles(new StaticFileOptions { ServeUnknownFileTypes = true });
 
 // Run migrations on startup for relational databases (skipped for InMemory test DB)
 {
