@@ -74,7 +74,7 @@ public class RatingService : IRatingService
             .ToListAsync();
 
         if (userRatings.Count == 0)
-            return new RatingSummaryDto(0, 0, 0, "Top 50%");
+            return new RatingSummaryDto(0, 0, 0, "");
 
         double userAvg = userRatings.Average(r => r.Score);
 

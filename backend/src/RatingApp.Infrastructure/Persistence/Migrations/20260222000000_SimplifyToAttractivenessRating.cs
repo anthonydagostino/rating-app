@@ -24,11 +24,11 @@ namespace RatingApp.Infrastructure.Persistence.Migrations
                 name: "RatingCriteria",
                 columns: table => new
                 {
-                    Id         = table.Column<Guid>(type: "uuid", nullable: false),
-                    Name       = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    Weight     = table.Column<double>(type: "double precision", nullable: false),
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    Weight = table.Column<double>(type: "double precision", nullable: false),
                     IsRequired = table.Column<bool>(type: "boolean", nullable: false),
-                    IsActive   = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true)
+                    IsActive = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true)
                 },
                 constraints: table =>
                 {
@@ -39,10 +39,10 @@ namespace RatingApp.Infrastructure.Persistence.Migrations
                 name: "RatingDetails",
                 columns: table => new
                 {
-                    Id          = table.Column<Guid>(type: "uuid", nullable: false),
-                    RatingId    = table.Column<Guid>(type: "uuid", nullable: false),
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    RatingId = table.Column<Guid>(type: "uuid", nullable: false),
                     CriterionId = table.Column<Guid>(type: "uuid", nullable: false),
-                    Score       = table.Column<int>(type: "integer", nullable: false)
+                    Score = table.Column<int>(type: "integer", nullable: false)
                 },
                 constraints: table =>
                 {

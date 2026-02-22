@@ -8,9 +8,9 @@ namespace RatingApp.Infrastructure.Persistence.Migrations
     /// <inheritdoc />
     public partial class AddMultiCriteriaRatings : Migration
     {
-        private static readonly Guid SkillCriterionId     = new("00000000-0000-0000-0000-000000000001");
-        private static readonly Guid CommCriterionId      = new("00000000-0000-0000-0000-000000000002");
-        private static readonly Guid CultureCriterionId   = new("00000000-0000-0000-0000-000000000003");
+        private static readonly Guid SkillCriterionId = new("00000000-0000-0000-0000-000000000001");
+        private static readonly Guid CommCriterionId = new("00000000-0000-0000-0000-000000000002");
+        private static readonly Guid CultureCriterionId = new("00000000-0000-0000-0000-000000000003");
 
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -28,11 +28,11 @@ namespace RatingApp.Infrastructure.Persistence.Migrations
                 name: "RatingCriteria",
                 columns: table => new
                 {
-                    Id         = table.Column<Guid>(type: "uuid", nullable: false),
-                    Name       = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    Weight     = table.Column<double>(type: "double precision", nullable: false),
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    Weight = table.Column<double>(type: "double precision", nullable: false),
                     IsRequired = table.Column<bool>(type: "boolean", nullable: false),
-                    IsActive   = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true)
+                    IsActive = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true)
                 },
                 constraints: table =>
                 {
@@ -44,10 +44,10 @@ namespace RatingApp.Infrastructure.Persistence.Migrations
                 name: "RatingDetails",
                 columns: table => new
                 {
-                    Id          = table.Column<Guid>(type: "uuid", nullable: false),
-                    RatingId    = table.Column<Guid>(type: "uuid", nullable: false),
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    RatingId = table.Column<Guid>(type: "uuid", nullable: false),
                     CriterionId = table.Column<Guid>(type: "uuid", nullable: false),
-                    Score       = table.Column<int>(type: "integer", nullable: false)
+                    Score = table.Column<int>(type: "integer", nullable: false)
                 },
                 constraints: table =>
                 {
