@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches:
+      - main
       - dev
       - 'feature/**'
   pull_request:
@@ -77,4 +78,4 @@ jobs:
         run: dotnet restore frontend/RatingApp.Client/RatingApp.Client.csproj
 
       - name: Build
-        run: dotnet build frontend/RatingApp.Client/RatingApp.Client.csproj --no-restore -c Release
+        run: dotnet build frontend/RatingApp.Client/RatingApp.Client.csproj --no-restore -c Release -warnaserror

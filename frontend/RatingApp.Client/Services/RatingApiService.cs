@@ -9,24 +9,17 @@ public class RatingApiService
 
     public RatingApiService(HttpClient http) => _http = http;
 
-    public async Task<List<CriterionModel>> GetCriteriaAsync()
-    {
-        return await _http.GetFromJsonAsync<List<CriterionModel>>("api/ratings/criteria")
-            ?? new List<CriterionModel>();
-    }
-
-    public async Task<RatingResult?> SubmitRatingAsync(Guid ratedUserId, List<CriterionScoreModel> criteriaScores, string? comment = null)
+    public async Task<RatingResult?> SubmitRatingAsync(Guid ratedUserId, int score, string? comment = null)
     {
         var response = await _http.PostAsJsonAsync("api/ratings",
-            new MultiCriteriaRatingRequest(ratedUserId, criteriaScores, comment));
+            new SimpleRatingRequest(ratedUserId, score, comment));
         return response.IsSuccessStatusCode
             ? await response.Content.ReadFromJsonAsync<RatingResult>()
             : null;
     }
 
-    public async Task<AggregateRatingModel?> GetAggregateAsync(Guid candidateId)
+    public async Task<RatingSummaryModel?> GetRatingSummaryAsync(Guid userId)
     {
-        return await _http.GetFromJsonAsync<AggregateRatingModel>(
-            $"api/ratings/candidates/{candidateId}/aggregate");
+        return await _http.GetFromJsonAsync<RatingSummaryModel>($"api/ratings/summary/{userId}");
     }
 }

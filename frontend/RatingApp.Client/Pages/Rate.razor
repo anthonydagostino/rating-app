@@ -85,59 +85,38 @@
         </div>
 
         <div class="rating-card">
-            @if (_criteria.Count == 0)
-            {
-                <p style="color:var(--muted);text-align:center">Loading criteria...</p>
-            }
-            else
-            {
-                @foreach (var criterion in _criteria)
+            <div style="font-size:1rem;font-weight:700;margin-bottom:1rem;text-align:center">Rate Attractiveness</div>
+
+            <div style="display:flex;justify-content:center;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.75rem">
+                @for (int i = 1; i <= 10; i++)
                 {
-                    var score = _criteriaScores[criterion.Id];
-                    <div class="criterion-row" style="margin-bottom:1rem">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem">
-                            <span class="criterion-name" style="font-weight:600;font-size:0.95rem">
-                                @criterion.Name
-                                @if (criterion.IsRequired)
-                                {
-                                    <span style="color:#FD297B;margin-left:2px">*</span>
-                                }
-                            </span>
-                            <span class="criterion-score-badge" style="font-weight:700;color:#FD297B;min-width:1.5rem;text-align:right">
-                                @score
-                            </span>
-                        </div>
-                        <input type="range" class="tinder-range" min="1" max="10" step="1"
-                               value="@score"
-                               @onchange="e => OnCriterionScoreChanged(criterion.Id, e.Value!.ToString()!)" />
-                        <div class="rating-range-labels" style="font-size:0.75rem">
-                            <span>Not interested</span>
-                            <span>Perfect match</span>
-                        </div>
-                    </div>
+                    var n = i;
+                    <button class="score-btn @(n == _score ? "score-btn-selected" : "")"
+                            @onclick="() => _score = n">
+                        @n
+                    </button>
                 }
+            </div>
 
-                <div class="aggregate-preview" style="margin-top:1.25rem;padding:0.75rem 1rem;background:rgba(253,41,123,0.06);border-radius:12px;display:flex;align-items:center;justify-content:space-between">
-                    <span style="font-size:0.9rem;color:var(--muted)">Weighted score</span>
-                    <span style="font-size:1.4rem;font-weight:700;color:#FD297B">@_liveAggregate.ToString("F1")</span>
-                </div>
+            <div style="text-align:center;font-size:0.9rem;color:var(--muted);margin-bottom:1rem">
+                @GetScoreDescriptor()
+            </div>
 
-                <div style="margin-top:1rem">
-                    <textarea class="form-control" placeholder="Add a comment (optional, max 500 chars)"
-                              maxlength="500" rows="2"
-                              style="resize:none;border-radius:10px;font-size:0.9rem"
-                              @bind="_comment"></textarea>
-                </div>
-            }
+            <div>
+                <textarea class="form-control" placeholder="Add a note... (optional)"
+                          maxlength="500" rows="2"
+                          style="resize:none;border-radius:10px;font-size:0.9rem"
+                          @bind="_comment"></textarea>
+            </div>
         </div>
 
         <div class="action-row">
             <button class="action-btn-skip" @onclick="Skip" title="Skip">
                 <i class="bi bi-x-lg"></i>
             </button>
-            <button class="action-btn-rate" @onclick="SubmitRating" disabled="@(_submitting || _criteria.Count == 0)">
+            <button class="action-btn-rate" @onclick="SubmitRating" disabled="@_submitting">
                 <i class="bi bi-heart-fill"></i>
-                @(_submitting ? "Rating..." : $"Rate {_liveAggregate:F1}/10")
+                @(_submitting ? "Rating..." : $"Rate {_score}/10")
             </button>
         </div>
 
@@ -162,41 +141,29 @@
     private string? _matchMessage;
     private bool _allLoaded;
 
-    private List<CriterionModel> _criteria = new();
-    private Dictionary<Guid, int> _criteriaScores = new();
+    private int _score = 5;
     private string? _comment;
-
-    private double _liveAggregate => ComputeAggregate();
 
     protected override async Task OnInitializedAsync()
     {
-        _criteria = await RatingService.GetCriteriaAsync();
-        ResetScores();
-
         await LoadMoreCandidates(showLoading: true);
         Advance();
     }
 
-    private void ResetScores()
+    private void ResetForm()
     {
-        _criteriaScores = _criteria.ToDictionary(c => c.Id, _ => 7);
+        _score = 5;
         _comment = null;
     }
 
-    private void OnCriterionScoreChanged(Guid criterionId, string rawValue)
+    private string GetScoreDescriptor() => _score switch
     {
-        if (int.TryParse(rawValue, out var score))
-            _criteriaScores[criterionId] = score;
-    }
-
-    private double ComputeAggregate()
-    {
-        if (_criteria.Count == 0) return 0;
-        double totalWeight = _criteria.Sum(c => c.Weight);
-        if (totalWeight == 0) return 0;
-        double weighted = _criteria.Sum(c => _criteriaScores.TryGetValue(c.Id, out var s) ? s * c.Weight : 0);
-        return Math.Round(weighted / totalWeight, 1);
-    }
+        <= 2 => "Not my type",
+        <= 4 => "Below average",
+        <= 6 => "Average",
+        <= 8 => "Attractive",
+        _    => "Very attractive"
+    };
 
     private async Task LoadMoreCandidates(bool showLoading = false)
     {
@@ -216,7 +183,7 @@
     {
         _current = _queue.Count > 0 ? _queue.Dequeue() : null;
         _photoIndex = 0;
-        ResetScores();
+        ResetForm();
 
         if (_queue.Count <= 2 && !_allLoaded)
             _ = LoadMoreCandidates();
@@ -235,14 +202,10 @@
 
     private async Task SubmitRating()
     {
-        if (_current is null || _criteria.Count == 0) return;
+        if (_current is null) return;
         _submitting = true;
 
-        var criteriaScores = _criteria
-            .Select(c => new CriterionScoreModel(c.Id, _criteriaScores[c.Id]))
-            .ToList();
-
-        var result = await RatingService.SubmitRatingAsync(_current.UserId, criteriaScores, _comment);
+        var result = await RatingService.SubmitRatingAsync(_current.UserId, _score, _comment);
 
         if (result?.MatchCreated == true)
         {

@@ -13,9 +13,9 @@ namespace RatingApp.Api.Controllers;
 public class RatingsController : ControllerBase
 {
     private readonly IRatingService _ratingService;
-    private readonly IValidator<RatingCreateDto> _validator;
+    private readonly IValidator<RateUserRequest> _validator;
 
-    public RatingsController(IRatingService ratingService, IValidator<RatingCreateDto> validator)
+    public RatingsController(IRatingService ratingService, IValidator<RateUserRequest> validator)
         => (_ratingService, _validator) = (ratingService, validator);
 
     private Guid CurrentUserId =>
@@ -23,24 +23,17 @@ public class RatingsController : ControllerBase
             ?? User.FindFirstValue("sub")
             ?? throw new InvalidOperationException("User ID claim not found."));
 
-    [HttpGet("criteria")]
-    public async Task<IActionResult> GetCriteria()
-    {
-        var criteria = await _ratingService.GetCriteriaAsync();
-        return Ok(criteria);
-    }
-
     [HttpPost]
-    public async Task<IActionResult> SubmitRating([FromBody] RatingCreateDto req)
+    public async Task<IActionResult> SubmitRating([FromBody] RateUserRequest request)
     {
-        var validation = await _validator.ValidateAsync(req);
+        var validation = await _validator.ValidateAsync(request);
         if (!validation.IsValid)
             return BadRequest(new { errors = validation.Errors.Select(e => e.ErrorMessage) });
 
         try
         {
-            var matchId = await _ratingService.AddRating(CurrentUserId, req);
-            return Ok(new { matchCreated = matchId.HasValue, matchId });
+            var (matchCreated, matchId) = await _ratingService.SubmitRatingAsync(CurrentUserId, request);
+            return Ok(new { matchCreated, matchId });
         }
         catch (InvalidOperationException ex)
         {
@@ -48,10 +41,10 @@ public class RatingsController : ControllerBase
         }
     }
 
-    [HttpGet("candidates/{id:guid}/aggregate")]
-    public async Task<IActionResult> GetAggregate(Guid id)
+    [HttpGet("summary/{userId:guid}")]
+    public async Task<IActionResult> GetRatingSummary(Guid userId)
     {
-        var aggregate = await _ratingService.GetAggregatedScores(id);
-        return Ok(aggregate);
+        var summary = await _ratingService.GetRatingSummaryAsync(userId);
+        return Ok(summary);
     }
 }

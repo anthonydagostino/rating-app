@@ -78,10 +78,37 @@
     @if (_summary is not null)
     {
         <div class="profile-section" style="text-align:center">
-            <div class="rating-summary-number">@_summary.AverageScore.ToString("F1")</div>
-            <div style="color:var(--muted);font-size:0.85rem;margin-top:0.25rem">
-                avg rating from @_summary.RatingCount person(s)
-            </div>
+            <div class="profile-section-title">My Attractiveness Rating</div>
+
+            @if (_summary.RatingCount < 5)
+            {
+                <div style="color:var(--muted);font-size:0.9rem;padding:1rem 0">
+                    Not enough ratings yet
+                    @if (_summary.RatingCount > 0)
+                    {
+                        <span> (@_summary.RatingCount so far)</span>
+                    }
+                </div>
+            }
+            else
+            {
+                <div style="font-size:2.5rem;font-weight:900;line-height:1;background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:0.25rem">
+                    @_summary.AverageScore.ToString("F1") <span style="font-size:1.1rem;font-weight:400;-webkit-text-fill-color:#9E9E9E">/ 10</span>
+                </div>
+                <div style="font-size:1.25rem;letter-spacing:2px;margin-bottom:0.75rem;color:#FD297B">
+                    @GetStars(_summary.AverageScore)
+                </div>
+                <div style="display:flex;justify-content:center;align-items:center;gap:0.75rem">
+                    @if (!string.IsNullOrEmpty(_summary.TopPercentLabel))
+                    {
+                        <span style="background:#26b050;color:white;border-radius:50px;padding:0.25rem 0.875rem;font-size:0.85rem;font-weight:700">
+                            @_summary.TopPercentLabel
+                        </span>
+                        <span style="color:#E0E0E0">•</span>
+                    }
+                    <span style="color:var(--muted);font-size:0.85rem">@_summary.RatingCount ratings</span>
+                </div>
+            }
         </div>
     }
 
@@ -107,15 +134,9 @@
                     <label>Age</label>
                     <input class="tinder-input" value="@_profile.Age" disabled />
                 </div>
-                <div class="row-fields">
-                    <div class="form-field">
-                        <label>Latitude</label>
-                        <InputNumber @bind-Value="_editModel.Latitude" class="tinder-input" />
-                    </div>
-                    <div class="form-field">
-                        <label>Longitude</label>
-                        <InputNumber @bind-Value="_editModel.Longitude" class="tinder-input" />
-                    </div>
+                <div class="form-field">
+                    <label>Location</label>
+                    <LocationPicker @bind-Latitude="_editModel.Latitude" @bind-Longitude="_editModel.Longitude" />
                 </div>
                 @if (_profileMessage is not null)
                 {
@@ -173,10 +194,11 @@
 @code {
     [Inject] private ProfileApiService ProfileService { get; set; } = default!;
     [Inject] private PhotoApiService PhotoService { get; set; } = default!;
+    [Inject] private RatingApiService RatingService { get; set; } = default!;
 
     private UserProfileDto? _profile;
     private PreferenceDto? _prefs;
-    private RatingSummaryDto? _summary;
+    private RatingSummaryModel? _summary;
     private List<PhotoDto>? _photos;
     private readonly EditProfileModel _editModel = new();
     private readonly EditPrefsModel _prefsModel = new();
@@ -187,7 +209,8 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await Task.WhenAll(LoadProfile(), LoadPreferences(), LoadSummary(), LoadPhotos());
+        await Task.WhenAll(LoadProfile(), LoadPreferences(), LoadPhotos());
+        await LoadSummary();
     }
 
     private async Task LoadPhotos()
@@ -229,8 +252,15 @@
 
     private async Task LoadSummary()
     {
-        try { _summary = await ProfileService.GetRatingSummaryAsync(); }
+        if (_profile is null) return;
+        try { _summary = await RatingService.GetRatingSummaryAsync(_profile.Id); }
         catch { }
+    }
+
+    private static string GetStars(double score)
+    {
+        int filled = (int)Math.Round(score);
+        return new string('★', filled) + new string('☆', 10 - filled);
     }
 
     private async Task OnFileSelected(InputFileChangeEventArgs e)

@@ -1,16 +1,15 @@
 namespace RatingApp.Domain.Entities;
 
-public class Rating
+public class SessionParticipantRating
 {
     public Guid Id { get; set; }
+    public Guid SessionId { get; set; }
     public Guid RaterUserId { get; set; }
-    public Guid RatedUserId { get; set; }
-    public int Score { get; set; }
+    public int? Score { get; set; }
+    public string? Notes { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
-    public string? Comment { get; set; }
-
+    public RatingSession Session { get; set; } = null!;
     public AppUser Rater { get; set; } = null!;
-    public AppUser Rated { get; set; } = null!;
 }

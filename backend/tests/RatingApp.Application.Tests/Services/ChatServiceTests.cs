@@ -168,7 +168,7 @@ public class ChatServiceTests
         var t = DateTime.UtcNow;
 
         db.Messages.AddRange(
-            new Message { Id = Guid.NewGuid(), ChatId = chat.Id, SenderUserId = userB.Id, Content = "first",  CreatedAt = t },
+            new Message { Id = Guid.NewGuid(), ChatId = chat.Id, SenderUserId = userB.Id, Content = "first", CreatedAt = t },
             new Message { Id = Guid.NewGuid(), ChatId = chat.Id, SenderUserId = userA.Id, Content = "second", CreatedAt = t.AddMinutes(1) }
         );
         await db.SaveChangesAsync();

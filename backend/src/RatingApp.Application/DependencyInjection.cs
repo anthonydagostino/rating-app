@@ -16,6 +16,7 @@ public static class DependencyInjection
         services.AddScoped<RatingService>();
         services.AddScoped<ChatService>();
         services.AddScoped<PhotoService>();
+        services.AddScoped<RatingSessionService>();
 
         services.AddValidatorsFromAssemblyContaining<RegisterRequestValidator>();
 

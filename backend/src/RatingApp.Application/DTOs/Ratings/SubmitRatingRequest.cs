@@ -1,3 +1,3 @@
 namespace RatingApp.Application.DTOs.Ratings;
 
-public record SubmitRatingRequest(Guid RatedUserId, int Score);
+public record RateUserRequest(Guid RatedUserId, int Score, string? Comment = null);
