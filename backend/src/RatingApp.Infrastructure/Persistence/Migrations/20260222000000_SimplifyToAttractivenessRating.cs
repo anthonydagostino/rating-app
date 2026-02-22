@@ -6,24 +6,20 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace RatingApp.Infrastructure.Persistence.Migrations
 {
     /// <inheritdoc />
-    public partial class AddMultiCriteriaRatings : Migration
+    public partial class SimplifyToAttractivenessRating : Migration
     {
-        private static readonly Guid SkillCriterionId = new("00000000-0000-0000-0000-000000000001");
-        private static readonly Guid CommCriterionId = new("00000000-0000-0000-0000-000000000002");
-        private static readonly Guid CultureCriterionId = new("00000000-0000-0000-0000-000000000003");
-
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            // Add Comment column to Ratings
-            migrationBuilder.AddColumn<string>(
-                name: "Comment",
-                table: "Ratings",
-                type: "character varying(500)",
-                maxLength: 500,
-                nullable: true);
+            // Drop RatingDetails first (has FK to RatingCriteria)
+            migrationBuilder.DropTable(name: "RatingDetails");
 
-            // Create RatingCriteria table
+            migrationBuilder.DropTable(name: "RatingCriteria");
+        }
+
+        /// <inheritdoc />
+        protected override void Down(MigrationBuilder migrationBuilder)
+        {
             migrationBuilder.CreateTable(
                 name: "RatingCriteria",
                 columns: table => new
@@ -39,7 +35,6 @@ namespace RatingApp.Infrastructure.Persistence.Migrations
                     table.PrimaryKey("PK_RatingCriteria", x => x.Id);
                 });
 
-            // Create RatingDetails table
             migrationBuilder.CreateTable(
                 name: "RatingDetails",
                 columns: table => new
@@ -67,37 +62,15 @@ namespace RatingApp.Infrastructure.Persistence.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_RatingDetails_RatingId_CriterionId",
-                table: "RatingDetails",
-                columns: new[] { "RatingId", "CriterionId" },
-                unique: true);
-
-            migrationBuilder.CreateIndex(
                 name: "IX_RatingDetails_CriterionId",
                 table: "RatingDetails",
                 column: "CriterionId");
 
-            // Seed default criteria
-            migrationBuilder.InsertData(
-                table: "RatingCriteria",
-                columns: new[] { "Id", "Name", "Weight", "IsRequired", "IsActive" },
-                values: new object[,]
-                {
-                    { SkillCriterionId,   "Skill",         0.40, true,  true },
-                    { CommCriterionId,    "Communication", 0.35, true,  true },
-                    { CultureCriterionId, "Culture",       0.25, false, true }
-                });
-        }
-
-        /// <inheritdoc />
-        protected override void Down(MigrationBuilder migrationBuilder)
-        {
-            migrationBuilder.DropTable(name: "RatingDetails");
-            migrationBuilder.DropTable(name: "RatingCriteria");
-
-            migrationBuilder.DropColumn(
-                name: "Comment",
-                table: "Ratings");
+            migrationBuilder.CreateIndex(
+                name: "IX_RatingDetails_RatingId_CriterionId",
+                table: "RatingDetails",
+                columns: new[] { "RatingId", "CriterionId" },
+                unique: true);
         }
     }
 }

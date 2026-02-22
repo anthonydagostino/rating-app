@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using RatingApp.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using RatingApp.Infrastructure.Persistence;
 namespace RatingApp.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260222000000_SimplifyToAttractivenessRating")]
+    partial class SimplifyToAttractivenessRating
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -251,8 +254,6 @@ namespace RatingApp.Infrastructure.Persistence.Migrations
                         .HasForeignKey("RatingApp.Domain.Entities.Chat", "MatchId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("Match");
                 });
 
             modelBuilder.Entity("RatingApp.Domain.Entities.Match", b =>
@@ -268,10 +269,6 @@ namespace RatingApp.Infrastructure.Persistence.Migrations
                         .HasForeignKey("UserBId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("UserA");
-
-                    b.Navigation("UserB");
                 });
 
             modelBuilder.Entity("RatingApp.Domain.Entities.Message", b =>
@@ -287,10 +284,6 @@ namespace RatingApp.Infrastructure.Persistence.Migrations
                         .HasForeignKey("SenderUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("Chat");
-
-                    b.Navigation("Sender");
                 });
 
             modelBuilder.Entity("RatingApp.Domain.Entities.Photo", b =>
@@ -300,8 +293,6 @@ namespace RatingApp.Infrastructure.Persistence.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("RatingApp.Domain.Entities.Rating", b =>
@@ -317,10 +308,6 @@ namespace RatingApp.Infrastructure.Persistence.Migrations
                         .HasForeignKey("RaterUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("Rated");
-
-                    b.Navigation("Rater");
                 });
 
             modelBuilder.Entity("RatingApp.Domain.Entities.UserPreference", b =>
@@ -330,31 +317,6 @@ namespace RatingApp.Infrastructure.Persistence.Migrations
                         .HasForeignKey("RatingApp.Domain.Entities.UserPreference", "UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("RatingApp.Domain.Entities.AppUser", b =>
-                {
-                    b.Navigation("MessagesSent");
-
-                    b.Navigation("Photos");
-
-                    b.Navigation("Preference");
-
-                    b.Navigation("RatingsGiven");
-
-                    b.Navigation("RatingsReceived");
-                });
-
-            modelBuilder.Entity("RatingApp.Domain.Entities.Chat", b =>
-                {
-                    b.Navigation("Messages");
-                });
-
-            modelBuilder.Entity("RatingApp.Domain.Entities.Match", b =>
-                {
-                    b.Navigation("Chat");
                 });
 #pragma warning restore 612, 618
         }

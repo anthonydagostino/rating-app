@@ -1,3 +1,3 @@
 namespace RatingApp.Application.DTOs.Ratings;
 
-public record RatingSummaryDto(double AverageScore, int RatingCount);
+public record RatingSummaryDto(double AverageScore, int RatingCount, double Percentile, string TopPercentLabel);

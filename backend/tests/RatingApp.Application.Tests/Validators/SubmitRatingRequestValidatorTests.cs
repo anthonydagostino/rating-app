@@ -6,9 +6,9 @@ namespace RatingApp.Application.Tests.Validators;
 
 public class SubmitRatingRequestValidatorTests
 {
-    private readonly SubmitRatingRequestValidator _validator = new();
+    private readonly RateUserRequestValidator _validator = new();
 
-    private static SubmitRatingRequest ValidRequest() => new(
+    private static RateUserRequest ValidRequest() => new(
         RatedUserId: Guid.NewGuid(),
         Score: 7
     );

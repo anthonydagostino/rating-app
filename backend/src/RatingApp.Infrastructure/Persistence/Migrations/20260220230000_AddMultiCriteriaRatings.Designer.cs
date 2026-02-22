@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using RatingApp.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using RatingApp.Infrastructure.Persistence;
 namespace RatingApp.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260220230000_AddMultiCriteriaRatings")]
+    partial class AddMultiCriteriaRatings
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -215,6 +218,84 @@ namespace RatingApp.Infrastructure.Persistence.Migrations
                     b.ToTable("Ratings");
                 });
 
+            modelBuilder.Entity("RatingApp.Domain.Entities.RatingCriterion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<double>("Weight")
+                        .HasColumnType("double precision");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("RatingCriteria");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000001"),
+                            IsActive = true,
+                            IsRequired = true,
+                            Name = "Skill",
+                            Weight = 0.40
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000002"),
+                            IsActive = true,
+                            IsRequired = true,
+                            Name = "Communication",
+                            Weight = 0.35
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000003"),
+                            IsActive = true,
+                            IsRequired = false,
+                            Name = "Culture",
+                            Weight = 0.25
+                        });
+                });
+
+            modelBuilder.Entity("RatingApp.Domain.Entities.RatingDetail", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CriterionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RatingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Score")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CriterionId");
+
+                    b.HasIndex("RatingId", "CriterionId")
+                        .IsUnique();
+
+                    b.ToTable("RatingDetails");
+                });
+
             modelBuilder.Entity("RatingApp.Domain.Entities.UserPreference", b =>
                 {
                     b.Property<Guid>("Id")
@@ -251,8 +332,6 @@ namespace RatingApp.Infrastructure.Persistence.Migrations
                         .HasForeignKey("RatingApp.Domain.Entities.Chat", "MatchId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("Match");
                 });
 
             modelBuilder.Entity("RatingApp.Domain.Entities.Match", b =>
@@ -268,10 +347,6 @@ namespace RatingApp.Infrastructure.Persistence.Migrations
                         .HasForeignKey("UserBId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("UserA");
-
-                    b.Navigation("UserB");
                 });
 
             modelBuilder.Entity("RatingApp.Domain.Entities.Message", b =>
@@ -287,10 +362,6 @@ namespace RatingApp.Infrastructure.Persistence.Migrations
                         .HasForeignKey("SenderUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("Chat");
-
-                    b.Navigation("Sender");
                 });
 
             modelBuilder.Entity("RatingApp.Domain.Entities.Photo", b =>
@@ -300,8 +371,6 @@ namespace RatingApp.Infrastructure.Persistence.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("RatingApp.Domain.Entities.Rating", b =>
@@ -317,10 +386,21 @@ namespace RatingApp.Infrastructure.Persistence.Migrations
                         .HasForeignKey("RaterUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
 
-                    b.Navigation("Rated");
+            modelBuilder.Entity("RatingApp.Domain.Entities.RatingDetail", b =>
+                {
+                    b.HasOne("RatingApp.Domain.Entities.RatingCriterion", "Criterion")
+                        .WithMany("RatingDetails")
+                        .HasForeignKey("CriterionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
-                    b.Navigation("Rater");
+                    b.HasOne("RatingApp.Domain.Entities.Rating", "Rating")
+                        .WithMany("RatingDetails")
+                        .HasForeignKey("RatingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("RatingApp.Domain.Entities.UserPreference", b =>
@@ -330,31 +410,6 @@ namespace RatingApp.Infrastructure.Persistence.Migrations
                         .HasForeignKey("RatingApp.Domain.Entities.UserPreference", "UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("RatingApp.Domain.Entities.AppUser", b =>
-                {
-                    b.Navigation("MessagesSent");
-
-                    b.Navigation("Photos");
-
-                    b.Navigation("Preference");
-
-                    b.Navigation("RatingsGiven");
-
-                    b.Navigation("RatingsReceived");
-                });
-
-            modelBuilder.Entity("RatingApp.Domain.Entities.Chat", b =>
-                {
-                    b.Navigation("Messages");
-                });
-
-            modelBuilder.Entity("RatingApp.Domain.Entities.Match", b =>
-                {
-                    b.Navigation("Chat");
                 });
 #pragma warning restore 612, 618
         }
