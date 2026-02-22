@@ -58,14 +58,8 @@ public class SessionApiService : IAsyncDisposable
         _hub.On<ParticipantRatingDto>("RatingSubmitted", dto => OnRatingSubmitted?.Invoke(dto));
         _hub.On<ParticipantRatingDto>("RatingUpdated", dto => OnRatingUpdated?.Invoke(dto));
         _hub.On<SessionChatMessageDto>("ChatMessage", dto => OnChatMessage?.Invoke(dto));
-        _hub.On<object>("UserJoined", obj =>
-        {
-            // obj is anonymous { userId, sessionId }
-        });
-        _hub.On<object>("UserLeft", obj =>
-        {
-            // obj is anonymous { userId, sessionId }
-        });
+        _hub.On<Guid>("UserJoined", userId => OnUserJoined?.Invoke(userId));
+        _hub.On<Guid>("UserLeft", userId => OnUserLeft?.Invoke(userId));
 
         await _hub.StartAsync();
     }

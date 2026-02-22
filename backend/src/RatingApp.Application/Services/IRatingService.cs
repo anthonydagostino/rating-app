@@ -4,8 +4,6 @@ namespace RatingApp.Application.Services;
 
 public interface IRatingService
 {
-    Task<Guid?> AddRating(Guid raterId, RatingCreateDto dto);
-    Task<AggregateRatingDto> GetAggregatedScores(Guid candidateId);
-    Task<List<CriterionDto>> GetCriteriaAsync();
+    Task<(bool MatchCreated, Guid? MatchId)> SubmitRatingAsync(Guid raterId, RateUserRequest request);
     Task<RatingSummaryDto> GetRatingSummaryAsync(Guid userId);
 }

@@ -13,5 +13,4 @@ public class Rating
 
     public AppUser Rater { get; set; } = null!;
     public AppUser Rated { get; set; } = null!;
-    public ICollection<RatingDetail> RatingDetails { get; set; } = new List<RatingDetail>();
 }
